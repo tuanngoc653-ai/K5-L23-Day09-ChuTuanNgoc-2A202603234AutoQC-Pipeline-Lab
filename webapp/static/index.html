@@ -6,511 +6,720 @@
 <title>AutoQC — Kiểm nhãn</title>
 <style>
 :root{
-  --bg:#f6f7f9; --panel:#ffffff; --ink:#1b1f24; --muted:#5f6b7a; --line:#e2e6eb; --soft:#eef1f5;
-  --accent:#2f6fde; --accent-ink:#fff;
-  --ok:#1f8a4c; --ok-bg:#e3f4ea; --warn:#b26a00; --warn-bg:#fdf1dc; --err:#c22f2f; --err-bg:#fbe5e5;
-  --car:#2563eb; --person:#dc2626; --truck:#ea580c; --bus:#9333ea;
-  --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+  --bg:#f5f6f8; --panel:#fff; --ink:#1a1d21; --muted:#5d6876; --line:#e1e5ea; --soft:#eef1f4;
+  --accent:#2f6fde; --accent-soft:#e6eefc; --on-accent:#fff;
+  --ok:#1d8048; --ok-bg:#e2f3e9; --warn:#a86300; --warn-bg:#fcf0d9; --err:#c02b2b; --err-bg:#fbe4e4;
+  --car:#2563eb; --person:#dc2626; --truck:#ea580c; --bus:#9333ea; --focus:#facc15;
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.07);
 }
 @media (prefers-color-scheme: dark){:root{
-  --bg:#0f1216; --panel:#171b21; --ink:#e7eaee; --muted:#9aa5b1; --line:#2a313a; --soft:#1f252d;
-  --accent:#5b8ff0; --ok:#4cc47f; --ok-bg:#163223; --warn:#e6a23c; --warn-bg:#3a2a10; --err:#f07070; --err-bg:#3d1717;
-  --car:#5b8ff0; --person:#f06a6a; --truck:#f59145; --bus:#b77cf2; --shadow:none;
+  --bg:#0f1215; --panel:#171b20; --ink:#e8ebee; --muted:#9ba6b2; --line:#2a3139; --soft:#1f252c;
+  --accent:#5b8ff0; --accent-soft:#1d2b45; --ok:#4cc47f; --ok-bg:#15301f; --warn:#e6a23c; --warn-bg:#382810;
+  --err:#f07070; --err-bg:#3b1717; --car:#5b8ff0; --person:#f06a6a; --truck:#f59145; --bus:#b77cf2; --shadow:none;
 }}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-header{display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
-header h1{font-size:16px;margin:0;font-weight:650}
-header .sub{color:var(--muted);font-size:13px}
-.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-weight:650;font-size:12px;letter-spacing:.02em}
-.pill.Release{background:var(--ok-bg);color:var(--ok)} .pill.Hold{background:var(--warn-bg);color:var(--warn)}
-.pill.Rework{background:var(--err-bg);color:var(--err)} .pill.Paused,.pill.None{background:var(--soft);color:var(--muted)}
-.layout{display:grid;grid-template-columns:300px 1fr;gap:16px;padding:16px 20px;align-items:start}
-@media (max-width:900px){.layout{grid-template-columns:1fr}}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:14px 16px}
-.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 10px;font-weight:650}
-label.f{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
-input[type=text],select{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit}
-input[type=range]{width:100%}
-.rangeval{float:right;font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600}
-.hint{font-size:12px;color:var(--muted);margin-top:3px}
-button{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 10px;border-radius:7px;cursor:pointer}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel);padding:7px 12px;border-radius:8px}
 button:hover:not(:disabled){border-color:var(--accent)}
 button:disabled{opacity:.45;cursor:not-allowed}
-button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.btncol{display:flex;flex-direction:column;gap:8px;margin-top:14px}
-.btncol button{text-align:left}
-.btncol button small{display:block;opacity:.8;font-size:11.5px}
-.status{margin-top:12px;font-size:12.5px;color:var(--muted)}
-.banner{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 10px;margin-top:12px;font-size:12.5px}
-details summary{cursor:pointer;color:var(--muted);font-size:12.5px;margin-top:10px}
-pre.log{max-height:280px;overflow:auto;background:var(--soft);padding:8px;border-radius:6px;font-size:11.5px;white-space:pre-wrap}
-.tabs{display:flex;gap:4px;margin-bottom:12px}
-.tabs button{border-radius:7px}
-.verdict{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
-.verdict .big{font-size:30px;font-weight:750;letter-spacing:-.01em}
-.big.Release{color:var(--ok)} .big.Hold{color:var(--warn)} .big.Rework{color:var(--err)}
-.bar{position:relative;height:10px;background:var(--soft);border-radius:6px;margin:8px 0 4px;overflow:visible}
-.bar .fill{height:100%;border-radius:6px;background:var(--warn)}
-.bar .mark{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
-.funnel{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:14px}
-@media (max-width:1100px){.funnel{grid-template-columns:repeat(3,1fr)}}
-.stat{background:var(--soft);border-radius:8px;padding:8px 10px}
-.stat .n{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
-.stat .t{font-size:11.5px;color:var(--muted)}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
-th{color:var(--muted);font-weight:600;font-size:12px}
-td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
-tr.click{cursor:pointer} tr.click:hover td{background:var(--soft)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+button.big{padding:12px 20px;font-size:15px}
+button.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+button.ghost:hover{color:var(--ink)}
+button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+button.danger{color:var(--err)}
+input[type=text],select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+input[type=range]{width:100%}
+kbd{font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--soft);font-family:inherit}
+h2{font-size:20px;margin:0 0 4px} h3{font-size:14px;margin:0 0 8px}
+p{margin:0 0 10px}
+.muted{color:var(--muted)} .small{font-size:12.5px}
+
+/* header + stepper */
+header{display:flex;align-items:center;gap:16px;padding:10px 20px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10;flex-wrap:wrap}
+.brand{font-weight:700;font-size:15px;white-space:nowrap}
+.steps{display:flex;gap:6px;flex:1;justify-content:center;flex-wrap:wrap}
+.step{display:flex;align-items:center;gap:8px;border:none;background:transparent;padding:6px 12px;border-radius:999px;color:var(--muted)}
+.step .n{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--soft);font-weight:700;font-size:12px}
+.step.cur{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.step.cur .n{background:var(--accent);color:var(--on-accent)}
+.step.done .n{background:var(--ok-bg);color:var(--ok)}
+.step .arrow{color:var(--line)}
+.pill{padding:3px 10px;border-radius:999px;font-weight:700;font-size:12px;white-space:nowrap}
+.pill.Release{background:var(--ok-bg);color:var(--ok)} .pill.Hold{background:var(--warn-bg);color:var(--warn)}
+.pill.Rework{background:var(--err-bg);color:var(--err)} .pill.none{background:var(--soft);color:var(--muted)}
+
+main{padding:20px;max-width:1500px;margin:0 auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:20px}
+.stack>*+*{margin-top:16px}
+.center{max-width:760px;margin:0 auto}
+
+/* step 1 */
+.todo{list-style:none;padding:0;margin:14px 0 18px;display:grid;gap:10px}
+.todo li{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:start}
+.todo .ic{width:34px;height:34px;border-radius:8px;background:var(--soft);display:grid;place-items:center;font-size:17px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row input[type=text]{flex:1;min-width:200px}
+details.adv{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+details.adv summary{cursor:pointer;color:var(--muted)}
+.advgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:12px}
+@media (max-width:700px){.advgrid{grid-template-columns:1fr}}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
+@media (max-width:800px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--soft);border-radius:10px;padding:12px}
+.stat .n{font-size:26px;font-weight:750;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat .t{font-size:12.5px;color:var(--muted)}
+.stat.hl{background:var(--accent-soft)} .stat.hl .n{color:var(--accent)}
+.loading{display:flex;gap:10px;align-items:center;color:var(--muted);padding:6px 0}
+.spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s 1s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+
+/* step 2 */
+.rvtop{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.prog{flex:1;min-width:240px}
+.prog .bar{height:8px;background:var(--soft);border-radius:6px;overflow:hidden;margin-top:4px}
+.prog .bar div{height:100%;background:var(--accent)}
+.rv{display:grid;grid-template-columns:230px minmax(0,1fr) 340px;gap:12px;align-items:start}
+@media (max-width:1250px){.rv{grid-template-columns:200px minmax(0,1fr)} .rv .side{grid-column:1 / -1}}
+@media (max-width:800px){.rv{grid-template-columns:1fr}}
+.listcard{padding:10px}
+.ftabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+.ftabs button{padding:4px 8px;font-size:12px}
+.list{max-height:calc(100vh - 230px);overflow:auto}
+@media (max-width:800px){.list{max-height:220px}}
+.it{display:grid;grid-template-columns:22px 1fr;gap:6px;padding:7px 6px;border-radius:8px;cursor:pointer}
+.it:hover{background:var(--soft)} .it.sel{background:var(--accent-soft)}
+.it .st{font-size:14px;text-align:center}
+.it .nm{font-weight:600;font-size:13px}
+.it .why{font-size:11.5px;color:var(--muted);line-height:1.3}
+.it .why.e{color:var(--err)}
+.viewer{padding:10px}
+.vtool{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.vtool .sep{width:1px;height:24px;background:var(--line);margin:0 2px}
+.vtool .zl{min-width:46px;text-align:center;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.vtool button{padding:5px 10px}
+.wrap{position:relative;background:#0b0d10;border-radius:8px;overflow:hidden;user-select:none;touch-action:none;cursor:grab}
+.wrap.panning{cursor:grabbing} .wrap.draw{cursor:crosshair}
+.wrap canvas{position:absolute;left:0;top:0;transform-origin:0 0}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.side{padding:14px;position:sticky;top:70px}
+.side h3{display:flex;justify-content:space-between;align-items:center}
+.badge{font-size:11.5px;padding:2px 8px;border-radius:999px;font-weight:600}
+.badge.ok{background:var(--ok-bg);color:var(--ok)} .badge.ed{background:var(--accent-soft);color:var(--accent)} .badge.todo{background:var(--soft);color:var(--muted)}
+.iss{border:1px solid var(--line);border-radius:10px;padding:9px 10px;margin-bottom:8px}
+.iss.done{opacity:.55}
+.iss .tt{font-weight:650;font-size:13px}
+.iss .tt.e{color:var(--err)} .iss .tt.w{color:var(--warn)}
+.iss .dd{font-size:12.5px;color:var(--muted);margin:2px 0 6px}
+.iss .acts{display:flex;gap:6px;flex-wrap:wrap}
+.iss .acts button{padding:4px 9px;font-size:12.5px}
+.info{font-size:12.5px;color:var(--muted);background:var(--soft);border-radius:8px;padding:8px 10px;margin-bottom:8px}
+.boxes{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+.boxes td{padding:3px 4px;border-bottom:1px solid var(--line)}
+.boxes tr.sel td{background:var(--accent-soft)}
+.boxes select{padding:2px 4px;font-size:12.5px}
+.actions{display:grid;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.actions .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.banner{border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px}
+.banner.warn{background:var(--warn-bg);color:var(--warn)} .banner.err{background:var(--err-bg);color:var(--err)} .banner.info{background:var(--soft);color:var(--muted)}
+
+/* step 3 */
+.verdict{display:grid;grid-template-columns:64px 1fr;gap:16px;align-items:start}
+.verdict .icon{width:64px;height:64px;border-radius:16px;display:grid;place-items:center;font-size:30px}
+.verdict.Release .icon{background:var(--ok-bg)} .verdict.Hold .icon{background:var(--warn-bg)} .verdict.Rework .icon{background:var(--err-bg)}
+.verdict h2.Release{color:var(--ok)} .verdict h2.Hold{color:var(--warn)} .verdict h2.Rework{color:var(--err)}
+.meter{position:relative;height:10px;background:var(--soft);border-radius:6px;margin:12px 0 4px}
+.meter .fill{height:100%;border-radius:6px}
+.meter .mark{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--ink)}
+.next{background:var(--soft);border-radius:10px;padding:12px 14px;margin-top:14px}
+.next b{display:block;margin-bottom:4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12.5px;background:var(--panel);cursor:pointer}
+table.codes{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+table.codes th,table.codes td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+table.codes th{font-size:12px;color:var(--muted);font-weight:600}
+table.codes td.n{text-align:right;font-variant-numeric:tabular-nums}
+table.codes td.z{color:var(--muted)}
 .sev{font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;white-space:nowrap}
 .sev.error{background:var(--err-bg);color:var(--err)} .sev.warn{background:var(--warn-bg);color:var(--warn)}
-.zero{color:var(--muted)}
-.review{display:grid;grid-template-columns:290px 1fr;gap:12px;align-items:start}
-@media (max-width:1100px){.review{grid-template-columns:1fr}}
-.list{max-height:calc(100vh - 230px);overflow:auto;margin-top:8px;border-top:1px solid var(--line)}
-.item{padding:7px 6px;border-bottom:1px solid var(--line);cursor:pointer;display:grid;grid-template-columns:34px 1fr;gap:6px}
-.item:hover{background:var(--soft)} .item.sel{background:var(--soft);box-shadow:inset 3px 0 var(--accent)}
-.item .rk{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
-.item .nm{font-weight:600;font-size:13px}
-.chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:2px}
-.chip{font-size:10.5px;padding:0 5px;border-radius:4px;background:var(--soft);color:var(--muted);border:1px solid var(--line)}
-.chip.e{background:var(--err-bg);color:var(--err);border-color:transparent}
-.chip.ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}
-.toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
-.toolbar .sep{width:1px;height:22px;background:var(--line);margin:0 4px}
-.toolbar select{width:auto}
-.canvaswrap{position:relative;background:#000;border-radius:8px;overflow:hidden;line-height:0;user-select:none;touch-action:none;cursor:grab}
-.canvaswrap.panning{cursor:grabbing} .canvaswrap.adding{cursor:crosshair}
-.canvaswrap canvas{position:absolute;left:0;top:0;transform-origin:0 0;display:block;image-rendering:auto}
-.zoomlbl{font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted);min-width:44px;text-align:center}
-.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
-.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
-.cols2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
-@media (max-width:1100px){.cols2{grid-template-columns:1fr}}
-.iss{font-size:12.5px;padding:5px 0;border-bottom:1px dashed var(--line)}
-.iss code{font-size:11.5px}
-.empty{color:var(--muted);padding:30px;text-align:center}
-.boxrow select{width:auto;padding:2px 4px}
-.boxrow.sel td{background:var(--soft)}
-.toast{position:fixed;right:16px;bottom:16px;background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
-.toast.show{opacity:.95}
-.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s 1s linear infinite;vertical-align:-2px}
-@keyframes s{to{transform:rotate(360deg)}}
-kbd{font-size:11px;border:1px solid var(--line);border-radius:3px;padding:0 4px;background:var(--soft)}
+details.more summary{cursor:pointer;font-weight:600}
+pre.log{max-height:300px;overflow:auto;background:var(--soft);padding:10px;border-radius:8px;font-size:12px;white-space:pre-wrap}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:13.5px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;max-width:90vw}
+.toast.show{opacity:.96}
+.hidden{display:none !important}
 </style>
 </head>
 <body>
 <header>
-  <h1>AutoQC — Pipeline kiểm nhãn</h1>
-  <span class="sub">Máy kiểm quy tắc · người kiểm ý nghĩa</span>
-  <span style="flex:1"></span>
-  <span id="hdrVerdict" class="pill None">chưa chạy</span>
+  <div class="brand">AutoQC · Kiểm nhãn ảnh</div>
+  <nav class="steps">
+    <button class="step" data-step="1"><span class="n">1</span>Kiểm tra</button><span class="step arrow">›</span>
+    <button class="step" data-step="2"><span class="n">2</span>Duyệt ảnh</button><span class="step arrow">›</span>
+    <button class="step" data-step="3"><span class="n">3</span>Kết quả &amp; xuất</button>
+  </nav>
+  <span id="pill" class="pill none">chưa chạy</span>
 </header>
 
-<div class="layout">
-  <aside>
+<main>
+  <!-- ============ BƯỚC 1 ============ -->
+  <section id="s1" class="center stack">
     <div class="card">
-      <h2>Chạy pipeline</h2>
-      <label class="f" for="raw">Thư mục lô (images/ + labels/ + data.yaml)</label>
-      <input type="text" id="raw" value="data/raw">
-      <label class="f">duplicates.phash_dist <span class="rangeval" id="phashV"></span></label>
-      <input type="range" id="phash" min="0" max="20" step="1">
-      <div class="hint">Lớn hơn = gộp ảnh "giống" nhiều hơn (dễ loại nhầm).</div>
-      <label class="f">second_opinion.conf <span class="rangeval" id="confV"></span></label>
-      <input type="range" id="conf" min="0.1" max="0.9" step="0.05">
-      <div class="hint">Chỉ tin dự đoán model ≥ ngưỡng này. Nhỏ = nhiều cờ hơn.</div>
-      <div class="btncol">
-        <button class="primary" id="btnFull">▶ Chạy tự động<small>người duyệt mô phỏng, ngân sách 80 ảnh</small></button>
-        <button id="btnPause">⏸ Chạy &amp; dừng ở hàng đợi<small>để bạn tự duyệt / sửa nhãn trên web</small></button>
-        <button id="btnResume" disabled>⏵ Chạy tiếp sau khi duyệt<small>ảnh bạn đã sửa = đã duyệt</small></button>
+      <h2>Bước 1 · Kiểm tra tự động</h2>
+      <p class="muted">Chọn thư mục lô ảnh đã gán nhãn (có <code>images/</code>, <code>labels/</code>, <code>data.yaml</code>). Máy sẽ:</p>
+      <ul class="todo">
+        <li><span class="ic">🗑️</span><div><b>Loại ảnh không dùng được</b><div class="muted small">ảnh hỏng, quá nhỏ, ảnh trùng nhau, ảnh trùng với tập test</div></div></li>
+        <li><span class="ic">🔧</span><div><b>Tự sửa lỗi định dạng nhãn</b><div class="muted small">dòng nhãn hỏng, mã lớp không tồn tại, box tràn ra ngoài ảnh, box lặp</div></div></li>
+        <li><span class="ic">🔍</span><div><b>Tìm chỗ nghi gán sai</b><div class="muted small">so với một model nhận diện lớn hơn: thiếu box, sai lớp, box lỏng, box thừa</div></div></li>
+        <li><span class="ic">📋</span><div><b>Lập danh sách ảnh cần bạn xem</b><div class="muted small">ảnh nghi sai nặng nhất xếp trước; bạn xem tối đa <span class="budgetN">80</span> ảnh ở bước 2</div></div></li>
+      </ul>
+      <div class="row">
+        <input type="text" id="raw" value="data/raw" aria-label="Thư mục lô ảnh">
+        <button class="primary big" id="btnCheck">Bắt đầu kiểm tra</button>
       </div>
-      <div id="pausedBanner" class="banner" hidden></div>
-      <div class="status" id="status">Chưa chạy lần nào.</div>
-      <details id="logBox" hidden><summary>Xem log lần chạy cuối</summary><pre class="log" id="log"></pre></details>
-    </div>
-  </aside>
-
-  <main>
-    <div class="tabs">
-      <button id="tabOv" class="on">Tổng quan</button>
-      <button id="tabRv">Duyệt ảnh</button>
-    </div>
-
-    <section id="ov">
-      <div class="card" id="verdictCard"><div class="empty">Bấm <b>Chạy tự động</b> để bắt đầu.</div></div>
-      <div class="card" style="margin-top:12px">
-        <h2>Lỗi theo mã — trước sửa → sau sửa → cuối</h2>
-        <div id="codeTable"><div class="empty">Chưa có báo cáo.</div></div>
-        <div class="hint">Bấm một dòng để mở danh sách ảnh có mã đó.</div>
-      </div>
-    </section>
-
-    <section id="rv" hidden>
-      <div class="review">
-        <div class="card">
-          <h2>Ảnh</h2>
-          <select id="filter">
-            <option value="queue">Hàng đợi người duyệt</option>
-            <option value="flag">Còn cờ (danh sách mới nhất)</option>
-            <option value="all">Tất cả ảnh đã nhận</option>
-            <option value="removed">Bị loại ở cửa vào</option>
-          </select>
-          <input type="text" id="search" placeholder="Tìm tên ảnh hoặc mã lỗi…" style="margin-top:6px">
-          <div class="hint" id="listCount"></div>
-          <div class="list" id="list"></div>
+      <div id="runMsg" class="loading hidden"><span class="spin"></span><span>Máy đang kiểm tra… (khoảng 10 giây)</span></div>
+      <details class="adv">
+        <summary>Cài đặt nâng cao</summary>
+        <div class="advgrid">
+          <div>
+            <label class="small"><b>Độ nhạy phát hiện ảnh trùng</b> (phash_dist): <b id="phashV"></b></label>
+            <input type="range" id="phash" min="0" max="20" step="1">
+            <div class="muted small">Cao hơn = coi nhiều ảnh là "trùng" hơn, dễ loại nhầm ảnh khác nhau. Đã chọn 12 bằng calibration.</div>
+          </div>
+          <div>
+            <label class="small"><b>Độ tin tối thiểu của model</b> (conf): <b id="confV"></b></label>
+            <input type="range" id="conf" min="0.1" max="0.9" step="0.05">
+            <div class="muted small">Thấp hơn = máy nghi ngờ nhiều hơn (nhiều ảnh phải xem hơn). Đã chọn 0.6 bằng calibration.</div>
+          </div>
         </div>
-        <div class="card" id="viewer"><div class="empty">Chọn một ảnh ở danh sách bên trái.</div></div>
+        <div class="row" style="margin-top:14px">
+          <button id="btnDemo">Chạy demo: máy tự duyệt</button>
+          <span class="muted small">Bỏ qua bước 2: dùng người duyệt mô phỏng của bài lab (80 ảnh) rồi ra kết quả ngay.</span>
+        </div>
+      </details>
+    </div>
+
+    <div class="card hidden" id="s1res">
+      <h3>Máy đã kiểm xong</h3>
+      <div class="stats" id="s1stats"></div>
+      <div id="s1note" class="muted small"></div>
+      <div class="row" style="margin-top:14px"><button class="primary big" id="btnGo2">Sang bước 2: Duyệt ảnh →</button></div>
+    </div>
+  </section>
+
+  <!-- ============ BƯỚC 2 ============ -->
+  <section id="s2" class="hidden">
+    <div class="rvtop">
+      <div class="prog">
+        <div><b id="progT">Đã duyệt 0 / 80 ảnh</b> <span class="muted small" id="progS"></span></div>
+        <div class="bar"><div id="progB" style="width:0"></div></div>
       </div>
-    </section>
-  </main>
-</div>
+      <span id="unlabWarn" class="badge todo hidden"></span>
+      <button class="primary big" id="btnFinish">Xong, xem kết quả →</button>
+    </div>
+    <div id="s2banner"></div>
+    <div class="rv">
+      <div class="card listcard">
+        <div class="ftabs" id="ftabs"></div>
+        <div class="list" id="list"></div>
+      </div>
+      <div class="card viewer" id="viewer"><div class="muted" style="padding:40px;text-align:center">Chọn một ảnh ở danh sách bên trái.</div></div>
+      <div class="card side" id="side"><div class="muted">Thông tin ảnh sẽ hiện ở đây.</div></div>
+    </div>
+  </section>
+
+  <!-- ============ BƯỚC 3 ============ -->
+  <section id="s3" class="center stack hidden">
+    <div class="card" id="verdict"></div>
+    <div class="card" id="exportCard"></div>
+    <div class="card">
+      <details class="more"><summary>Chi tiết: số lỗi theo từng loại</summary><div id="codes"></div></details>
+    </div>
+    <div class="card">
+      <details class="more"><summary>Nhật ký chạy</summary><pre class="log" id="log"></pre></details>
+    </div>
+  </section>
+</main>
 <div class="toast" id="toast"></div>
 
 <script>
+// ================= tiện ích =================
 const $ = s => document.querySelector(s);
 const el = (tag, attrs = {}, ...kids) => {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
-    if (k === "class") e.className = v; else if (k === "text") e.textContent = v;
-    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else if (v !== false && v != null) e.setAttribute(k, v);
+    if (v === false || v == null) continue;
+    if (k === "class") e.className = v; else if (k === "text") e.textContent = v; else if (k === "html") e.innerHTML = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v === true ? "" : v);
   }
-  for (const k of kids) if (k != null) e.append(k);
+  for (const k of kids.flat()) if (k != null && k !== false) e.append(k);
   return e;
 };
-const CLS_COLORS = () => { const cs = getComputedStyle(document.documentElement); return ["--car","--person","--truck","--bus"].map(v => cs.getPropertyValue(v).trim()); };
-let S = null, IMAGES = [], REMOVED = [], CUR = null, codeFilter = null;
+function toast(m){ const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 3000); }
+async function api(path, opts){
+  const r = await fetch(path, opts); const ct = r.headers.get("content-type") || "";
+  const data = ct.includes("json") ? await r.json() : {error: await r.text()};
+  if (!r.ok) throw new Error(data.error || ("HTTP " + r.status)); return data;
+}
+const post = (path, body) => api(path, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body || {})});
+const COLORS = () => { const cs = getComputedStyle(document.documentElement); return ["--car","--person","--truck","--bus"].map(v => cs.getPropertyValue(v).trim()); };
+const VI = {car:"ô tô", person:"người", truck:"xe tải", bus:"xe buýt"};
+const cname = i => S.classes[i] ?? ("lớp " + i);
+const cnameVi = i => `${cname(i)} (${VI[cname(i)] || ""})`;
+const pct = x => (x * 100).toFixed(1).replace(".0", "") + "%";
+const iou = (a, b) => {
+  const [ax1, ay1, ax2, ay2] = [a[0]-a[2]/2, a[1]-a[3]/2, a[0]+a[2]/2, a[1]+a[3]/2], [bx1, by1, bx2, by2] = [b[0]-b[2]/2, b[1]-b[3]/2, b[0]+b[2]/2, b[1]+b[3]/2];
+  const iw = Math.max(0, Math.min(ax2,bx2) - Math.max(ax1,bx1)), ih = Math.max(0, Math.min(ay2,by2) - Math.max(ay1,by1)), inter = iw*ih;
+  const u = a[2]*a[3] + b[2]*b[3] - inter; return u > 0 ? inter / u : 0;
+};
+const NAME = {
+  BAD_CLASS_ID:"Mã lớp không tồn tại", BAD_CLASS_NAME:"Tên lớp trong data.yaml sai", BAD_FORMAT:"Dòng nhãn sai định dạng", BAD_SIZE:"Ảnh quá nhỏ",
+  BOX_OUT_OF_IMAGE:"Box tràn ra ngoài ảnh", BOX_ZERO:"Box rỗng (rộng/cao = 0)", CORRUPT_IMAGE:"Ảnh hỏng, không mở được", DUP_BOX:"Box bị lặp",
+  DUP_IMAGE_EXACT:"Ảnh trùng y hệt ảnh khác", DUP_IMAGE_NEAR:"Ảnh gần trùng ảnh khác", LEAK_TEST:"Ảnh trùng với tập test", MISSING_LABEL_FILE:"Ảnh chưa có nhãn",
+  ORPHAN_LABEL:"File nhãn không có ảnh", EMPTY_LABEL:"Ảnh không có box nào", BOX_TINY:"Box rất nhỏ", BOX_HUGE:"Box gần phủ cả ảnh",
+  CLASS_RARE:"Lớp có quá ít mẫu", DENSE_IMAGE:"Ảnh có quá nhiều box", POSSIBLE_MISSING:"Có thể thiếu box", POSSIBLE_WRONG_CLASS:"Có thể sai lớp",
+  POSSIBLE_LOOSE_BOX:"Box có thể lỏng / lệch", POSSIBLE_FALSE_POS:"Box có thể thừa",
+  FIXED_DROP_LINE:"máy đã xoá dòng hỏng", FIXED_CLIP_BOX:"máy đã cắt box tràn", NEEDS_LABEL:"chưa có nhãn",
+};
 
-function toast(msg){ const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
-async function api(path, opts){ const r = await fetch(path, opts); if (!r.ok){ const txt = await r.text(); const m = txt.match(/<p>(.*?)<\/p>/s); throw new Error(m ? m[1] : txt.slice(0,200)); } return r.json(); }
+// ================= trạng thái =================
+let S = null, IMAGES = [], REMOVED = [], STEP = 1, FILTER = "queue", CUR = null;
+const V = {img:null, boxes:[], sel:-1, dirty:false, tool:"select", addCls:0, showPred:true, showRaw:false, focus:null, done:new Set(),
+           s:1, tx:0, ty:0, fitS:1, cv:null, wrap:null, W:0, H:0, drag:null, space:false};
 
-// ---------- run controls
+async function load(){
+  S = await api("/api/state");
+  const d = await api("/api/images"); IMAGES = d.images; REMOVED = d.removed;
+  if (!load._init){ $("#phash").value = S.thresholds.phash_dist; $("#conf").value = S.thresholds.conf; $("#raw").value = S.raw || "data/raw"; load._init = true; }
+  syncRanges();
+  document.querySelectorAll(".budgetN").forEach(e => e.textContent = S.budget);
+  const dec = S.finished && S.summary ? S.summary.verdict.decision : null;
+  const p = $("#pill"); p.className = "pill " + (dec || "none");
+  p.textContent = dec ? ({Release:"ĐẠT", Hold:"TẠM GIỮ", Rework:"CHƯA ĐẠT"})[dec] : S.can_review ? "đang duyệt" : "chưa chạy";
+  renderStepper(); renderS1(); renderS2Top(); renderList(); renderS3();
+}
+function canStep(n){ return n === 1 || (n === 2 && S && S.stages.v2) || (n === 3 && S && S.finished); }
+function go(n){
+  if (!canStep(n)) return; STEP = n;
+  ["#s1","#s2","#s3"].forEach((s, i) => $(s).classList.toggle("hidden", i + 1 !== n));
+  renderStepper(); window.scrollTo({top:0});
+  if (n === 2 && !CUR){ const first = visibleItems().find(i => !i.status) || visibleItems()[0]; if (first) openImage(first.image); }
+  if (n === 2 && V.wrap) requestAnimationFrame(() => { sizeWrap(); fitView(); });
+}
+function renderStepper(){
+  document.querySelectorAll(".step[data-step]").forEach(b => {
+    const n = +b.dataset.step; b.disabled = !canStep(n);
+    b.classList.toggle("cur", n === STEP); b.classList.toggle("done", n < STEP && canStep(n));
+    b.onclick = () => go(n);
+  });
+}
+
+// ================= BƯỚC 1 =================
 function syncRanges(){ $("#phashV").textContent = $("#phash").value; $("#confV").textContent = Number($("#conf").value).toFixed(2); }
 $("#phash").oninput = syncRanges; $("#conf").oninput = syncRanges;
-
-async function run(mode){
-  const btns = ["#btnFull","#btnPause","#btnResume"].map(s => $(s)); btns.forEach(b => b.disabled = true);
-  $("#status").innerHTML = '<span class="spin"></span> Đang chạy pipeline…';
+async function runCheck(mode){
+  if (S && S.can_review && (S.edited.length + S.confirmed.length) > 0 &&
+      !confirm(`Bạn đã duyệt ${S.edited.length + S.confirmed.length} ảnh. Kiểm tra lại từ đầu sẽ XOÁ các chỉnh sửa này. Tiếp tục?`)) return;
+  $("#btnCheck").disabled = $("#btnDemo").disabled = true; $("#runMsg").classList.remove("hidden");
   try {
-    const r = await api("/api/run", {method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({mode, raw: $("#raw").value.trim(), phash_dist: +$("#phash").value, conf: +$("#conf").value})});
-    toast(r.exit === 30 ? "Đã dừng ở hàng đợi — mời bạn duyệt ảnh" : `Xong: mã thoát ${r.exit}`);
-    if (r.exit === 30){ showTab("rv"); $("#filter").value = "queue"; }
+    await post("/api/run", {mode, raw: $("#raw").value, phash_dist: +$("#phash").value, conf: +$("#conf").value});
+    CUR = null; V.dirty = false; await load();
+    if (mode === "check"){ toast("Kiểm tra xong — mời bạn duyệt các ảnh máy nghi sai"); }
+    else { toast("Demo xong — xem kết quả"); go(3); }
   } catch (e) { toast("Lỗi: " + e.message); }
-  await refresh(true);
+  $("#btnCheck").disabled = $("#btnDemo").disabled = false; $("#runMsg").classList.add("hidden");
 }
-$("#btnFull").onclick = () => run("full");
-$("#btnPause").onclick = () => run("no_review");
-$("#btnResume").onclick = () => run("resume");
-
-// ---------- tabs
-function showTab(t){ $("#ov").hidden = t !== "ov"; $("#rv").hidden = t !== "rv"; $("#tabOv").classList.toggle("on", t === "ov"); $("#tabRv").classList.toggle("on", t === "rv"); }
-$("#tabOv").onclick = () => showTab("ov"); $("#tabRv").onclick = () => showTab("rv");
-
-// ---------- state
-const EXIT_NAME = {0:"Release",10:"Hold",20:"Rework",30:"Paused"};
-async function refresh(reloadCurrent){
-  S = await api("/api/state");
-  if (!refresh._init){ $("#phash").value = S.thresholds.phash_dist; $("#conf").value = S.thresholds.conf; if (S.last.raw) $("#raw").value = S.last.raw; refresh._init = true; }
-  syncRanges();
-  const dec = S.paused ? "Paused" : (S.summary ? S.summary.verdict.decision : "None");
-  const hv = $("#hdrVerdict"); hv.className = "pill " + dec;
-  hv.textContent = S.paused ? "đang chờ người duyệt" : (S.summary ? dec.toUpperCase() : "chưa chạy");
-  $("#btnResume").disabled = !S.paused; $("#btnFull").disabled = false; $("#btnPause").disabled = false;
-  if (S.has_run){
-    const l = S.last;
-    $("#status").textContent = `Lần cuối ${l.at}: ${l.mode === "full" ? "tự động" : l.mode === "no_review" ? "dừng ở hàng đợi" : "chạy tiếp"} · mã thoát ${l.exit} (${EXIT_NAME[l.exit] || "lỗi"}) · ${l.seconds}s`;
-    $("#logBox").hidden = false; $("#log").textContent = l.log;
-  }
-  const pb = $("#pausedBanner");
-  if (S.paused){ pb.hidden = false; pb.innerHTML = `<b>Đang chờ người duyệt.</b> Đã sửa <b>${S.edited.length}/${S.budget}</b> ảnh. Hàng đợi ${S.queue_len} ảnh. Sửa xong bấm <b>Chạy tiếp</b>.`; }
-  else pb.hidden = true;
-  renderOverview();
-  const d = await api("/api/images"); IMAGES = d.images; REMOVED = d.removed; renderList();
-  if (reloadCurrent && CUR) openImage(CUR.image, true);
+$("#btnCheck").onclick = () => runCheck("check");
+$("#btnDemo").onclick = () => runCheck("demo");
+$("#btnGo2").onclick = () => go(2);
+function renderS1(){
+  const box = $("#s1res");
+  if (!S.has_run || !S.stages.v1){ box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+  const fixN = Object.values(S.fixes).reduce((a,b) => a+b, 0);
+  const st = $("#s1stats"); st.replaceChildren(
+    el("div",{class:"stat"}, el("div",{class:"n",text:S.n_scanned ?? "–"}), el("div",{class:"t",text:"ảnh nhận vào"})),
+    el("div",{class:"stat"}, el("div",{class:"n",text:S.n_intake_removed}), el("div",{class:"t",text:"ảnh bị loại (hỏng, trùng, lộ tập test)"})),
+    el("div",{class:"stat"}, el("div",{class:"n",text:fixN}), el("div",{class:"t",text:"chỗ máy đã tự sửa"})),
+    el("div",{class:"stat hl"}, el("div",{class:"n",text:S.queue_len}), el("div",{class:"t",text:"ảnh máy nghi sai, cần bạn xem"})));
+  $("#s1note").textContent = S.mode === "demo"
+    ? "Bạn đã chạy chế độ demo (máy tự duyệt). Muốn tự duyệt, bấm “Bắt đầu kiểm tra”."
+    : `Bạn có ngân sách ${S.budget} ảnh để xem. Ảnh nghi sai nặng nhất được xếp trước — cứ đi từ trên xuống.` + (S.unlabeled.length ? ` Lưu ý: ${S.unlabeled.length} ảnh CHƯA CÓ NHÃN, bắt buộc phải gán.` : "");
+  $("#btnGo2").textContent = S.mode === "demo" ? "Xem các ảnh (chỉ xem) →" : "Sang bước 2: Duyệt ảnh →";
 }
 
-// ---------- overview
-function renderOverview(){
-  const vc = $("#verdictCard"); vc.replaceChildren();
-  if (!S.has_run || (!S.summary && !S.paused)){ vc.append(el("div",{class:"empty",text: S.has_run ? "Lần chạy cuối không ra kết luận — xem log." : "Bấm Chạy tự động để bắt đầu."})); }
-  else if (S.paused){
-    vc.append(el("h2",{text:"Kết luận"}), el("div",{class:"verdict"}, el("div",{class:"big",text:"⏸"}),
-      el("div",{}, el("b",{text:"Pipeline tạm dừng chờ người duyệt (mã 30)."}), el("div",{class:"hint",text:`Sửa nhãn các ảnh đầu hàng đợi ở tab Duyệt ảnh (tối đa ${S.budget} ảnh), rồi bấm “Chạy tiếp sau khi duyệt”. Ảnh chưa có nhãn mà không ai gán ⇒ Rework.`}))));
-  } else {
-    const v = S.summary.verdict, pct = v.warn_ratio * 100, hold = S.hold_ratio * 100, maxp = Math.max(pct, hold) * 1.4 || 20;
-    const bar = el("div",{class:"bar"}, el("div",{class:"fill",style:`width:${Math.min(100,pct/maxp*100)}%;background:var(${pct>=hold?"--warn":"--ok"})`}), el("div",{class:"mark",style:`left:${hold/maxp*100}%`,title:`ngưỡng Hold ${hold}%`}));
-    vc.append(el("h2",{text:"Kết luận"}), el("div",{class:"verdict"},
-      el("div",{class:"big " + v.decision, text:v.decision.toUpperCase()}),
-      el("div",{}, el("div",{text:v.reasons.join("; ")}),
-        el("div",{class:"hint",text:`Lỗi bắt buộc: ${v.n_errors} · ảnh còn cảnh báo chưa duyệt: ${v.n_warn_images}/${v.n_images} (${pct.toFixed(1)}%) · vạch đen = ngưỡng Hold ${hold}%`}), bar,
-        el("div",{class:"hint",text: S.summary.exported ? "Đã xuất dataset (" + (v.decision === "Release" ? "bản phát hành" : "bản nháp") + ")." : "KHÔNG xuất dataset (Rework)."}))));
-  }
-  const st = S.stages, cnt = (o, sev) => o ? Object.values(o).filter(x => !sev || x.severity === sev).reduce((a,x) => a + x.n, 0) : null;
-  const nIntakeImgs = S.stages.intake ? Object.values(S.stages.intake).reduce((a,x)=>a+x.images,0) : null;
-  if (S.has_run){
-    const f = el("div",{class:"funnel"});
-    const fixesN = Object.values(S.fixes).reduce((a,b)=>a+b,0);
-    [[S.n_scanned,"ảnh quét"],[nIntakeImgs,"bị loại ở cửa vào"],[cnt(st.v1,"error") - (cnt(st.intake,"error")||0),"lỗi bắt buộc (v1)"],[fixesN,"thay đổi máy tự sửa"],[S.queue_len,"ảnh vào hàng đợi"],[S.paused ? S.edited.length : S.reviewed_sim,"ảnh người đã duyệt"]]
-      .forEach(([n,t]) => f.append(el("div",{class:"stat"}, el("div",{class:"n",text: n == null ? "–" : n}), el("div",{class:"t",text:t}))));
-    vc.append(f);
-  }
-  // code table
-  const ct = $("#codeTable"); ct.replaceChildren();
-  if (!st.v1){ ct.append(el("div",{class:"empty",text:"Chưa có báo cáo."})); return; }
-  const codes = new Set([...Object.keys(st.v1), ...Object.keys(st.v2||{}), ...Object.keys(st.v3||{})]);
-  const sevOf = c => (st.v1[c] || (st.v2||{})[c] || (st.v3||{})[c]).severity;
-  const rows = [...codes].sort((a,b) => (sevOf(a) === sevOf(b) ? a.localeCompare(b) : sevOf(a) === "error" ? -1 : 1));
-  const cell = (o,c) => { const x = o && o[c]; return el("td",{class:"num" + (x ? "" : " zero"), text: o == null ? "–" : x ? `${x.n}` + (x.images !== x.n ? ` (${x.images} ảnh)` : "") : "0"}); };
-  const tb = el("tbody");
-  for (const c of rows){
-    const intake = st.intake && st.intake[c];
-    tb.append(el("tr",{class:"click", onclick:() => { codeFilter = c; showTab("rv"); $("#filter").value = intake ? "removed" : (st.v3||st.v2||{})[c] ? "flag" : "all"; $("#search").value = c; renderList(); }},
-      el("td",{}, el("code",{text:c})), el("td",{}, el("span",{class:"sev " + sevOf(c), text: sevOf(c) === "error" ? "bắt buộc" : "cảnh báo"})),
-      el("td",{class:"hint", text: intake ? "cửa vào — loại ảnh" : ""}), cell(st.v1,c), cell(st.v2,c), cell(st.v3,c)));
-  }
-  ct.append(el("table",{}, el("thead",{}, el("tr",{}, el("th",{text:"Mã"}), el("th",{text:"Mức"}), el("th",{text:""}), el("th",{class:"num",text:"v1 trước sửa"}), el("th",{class:"num",text:"v2 sau máy sửa"}), el("th",{class:"num",text:"v3 cuối"}))), tb));
+// ================= BƯỚC 2: khung trên + danh sách =================
+function renderS2Top(){
+  const n = S.reviewed, b = S.budget;
+  $("#progT").textContent = `Đã duyệt ${n} / ${b} ảnh`;
+  $("#progS").textContent = S.can_review ? `· ${S.edited.length} sửa, ${S.confirmed.length} xác nhận đúng · hàng đợi ${S.queue_len} ảnh` : "";
+  $("#progB").style.width = Math.min(100, n / b * 100) + "%";
+  const uw = $("#unlabWarn"); uw.classList.toggle("hidden", !S.unlabeled.length);
+  uw.className = "badge " + (S.unlabeled.length ? "todo" : "ok") + (S.unlabeled.length ? "" : " hidden");
+  uw.style.background = "var(--err-bg)"; uw.style.color = "var(--err)";
+  uw.textContent = `${S.unlabeled.length} ảnh chưa có nhãn`;
+  $("#btnFinish").classList.toggle("hidden", !S.can_review);
+  const bn = $("#s2banner"); bn.replaceChildren();
+  if (!S.can_review && S.has_run) bn.append(el("div",{class:"banner info", text:"Chế độ chỉ xem (đang ở kết quả demo). Muốn tự duyệt và sửa nhãn: quay lại Bước 1, bấm “Bắt đầu kiểm tra”."}));
+  else if (n > b) bn.append(el("div",{class:"banner err", text:`Đã duyệt ${n} ảnh, vượt ngân sách ${b}. Hãy bỏ bớt (bỏ đánh dấu “nhãn đúng”) trước khi xem kết quả.`}));
 }
-
-// ---------- list
-$("#filter").onchange = () => { codeFilter = null; renderList(); };
-$("#search").oninput = () => { codeFilter = null; renderList(); };
+$("#btnFinish").onclick = async () => {
+  if (V.dirty && !confirm("Ảnh hiện tại có thay đổi CHƯA LƯU. Bỏ thay đổi và xem kết quả?")) return;
+  V.dirty = false; $("#btnFinish").disabled = true;
+  try { await post("/api/finish"); await load(); go(3); } catch (e) { toast("Lỗi: " + e.message); }
+  $("#btnFinish").disabled = false;
+};
+function visibleItems(){
+  if (FILTER === "removed") return REMOVED.map(r => ({image:r.image, removed:true, why:NAME[r.code] || r.code}));
+  if (FILTER === "queue") return IMAGES.filter(i => i.rank).sort((a,b) => a.rank - b.rank);
+  if (FILTER === "todo") return IMAGES.filter(i => i.rank && !i.status).sort((a,b) => a.rank - b.rank);
+  return IMAGES;
+}
+function whyText(it){
+  if (it.removed) return it.why;
+  const codes = (it.queue_codes ? it.queue_codes.split(";") : it.codes).filter(c => !c.startsWith("FIXED_"));
+  return codes.map(c => (NAME[c] || c).replace(/^Có thể /, "")).join(" · ") || (it.codes.length ? "" : "không có cờ");
+}
 function renderList(){
-  const mode = $("#filter").value, q = $("#search").value.trim().toLowerCase();
+  const counts = {queue: IMAGES.filter(i => i.rank).length, todo: IMAGES.filter(i => i.rank && !i.status).length, all: IMAGES.length, removed: REMOVED.length};
+  const tabs = $("#ftabs"); tabs.replaceChildren(...[["todo","Chưa xem"],["queue","Hàng đợi"],["all","Tất cả"],["removed","Bị loại"]].map(([k, t]) =>
+    el("button",{class: FILTER === k ? "on" : "", onclick:() => { FILTER = k; renderList(); }, text:`${t} (${counts[k]})`})));
   const L = $("#list"); L.replaceChildren();
-  let items;
-  if (mode === "removed") items = REMOVED.map(r => ({image:r.image, codes:[r.code], removed:true, msg:r.message}));
-  else {
-    items = IMAGES.slice();
-    if (mode === "queue") items = items.filter(i => i.rank).sort((a,b) => a.rank - b.rank);
-    if (mode === "flag") items = items.filter(i => i.codes.length);
-  }
-  if (q) items = items.filter(i => i.image.toLowerCase().includes(q) || (i.codes||[]).join(" ").toLowerCase().includes(q) || (i.queue_codes||"").toLowerCase().includes(q));
-  $("#listCount").textContent = `${items.length} ảnh`;
-  for (const it of items){
-    const chips = el("div",{class:"chips"});
-    const cs = mode === "queue" && it.queue_codes ? it.queue_codes.split(";") : it.codes;
-    for (const c of cs) chips.append(el("span",{class:"chip" + (/MISSING_LABEL|NEEDS_LABEL|LEAK|DUP_IMAGE|CORRUPT|BAD_SIZE/.test(c) ? " e" : ""), text:c.replace("POSSIBLE_","~")}));
-    if (it.edited) chips.append(el("span",{class:"chip ok",text:"✎ đã sửa"}));
-    if (it.reviewed) chips.append(el("span",{class:"chip ok",text:"✓ đã duyệt (mô phỏng)"}));
-    if (it.has_label === false) chips.append(el("span",{class:"chip e",text:"chưa có nhãn"}));
-    const node = el("div",{class:"item" + (CUR && CUR.image === it.image ? " sel" : ""), onclick:() => openImage(it.image)},
-      el("div",{class:"rk",text: it.rank ? "#" + it.rank : it.removed ? "✕" : ""}), el("div",{}, el("div",{class:"nm",text:it.image}), chips));
+  for (const it of visibleItems()){
+    const st = it.removed ? "✕" : it.status === "edited" ? "✎" : it.status === "confirmed" ? "✓" : it.status === "sim" ? "✓" : it.has_label === false ? "!" : "○";
+    const why = whyText(it);
+    const node = el("div",{class:"it" + (CUR && CUR.image === it.image ? " sel" : ""), onclick:() => openImage(it.image), title: it.status === "edited" ? "Bạn đã sửa" : it.status === "confirmed" ? "Bạn đã xác nhận đúng" : ""},
+      el("div",{class:"st", style: it.status ? "color:var(--ok)" : it.has_label === false || it.removed ? "color:var(--err)" : "color:var(--muted)", text:st}),
+      el("div",{}, el("div",{class:"nm", text:(it.rank ? `#${it.rank} ` : "") + it.image}),
+        el("div",{class:"why" + (it.has_label === false || it.removed ? " e" : ""), text: it.has_label === false ? "CHƯA CÓ NHÃN — cần gán" : why})));
     node.dataset.stem = it.image; L.append(node);
   }
 }
-function navList(d){
-  const nodes = [...document.querySelectorAll("#list .item")]; if (!nodes.length) return;
-  let i = nodes.findIndex(n => n.dataset.stem === (CUR && CUR.image)); i = Math.max(0, Math.min(nodes.length - 1, i + d));
-  nodes[i].click(); nodes[i].scrollIntoView({block:"nearest"});
+function nextImage(d = 1){
+  const items = visibleItems(); if (!items.length) return;
+  let i = items.findIndex(x => x.image === (CUR && CUR.image));
+  i = Math.max(0, Math.min(items.length - 1, i + d));
+  openImage(items[i].image);
+  const n = document.querySelector(`#list .it[data-stem="${items[i].image}"]`); if (n) n.scrollIntoView({block:"nearest"});
 }
 
-// ---------- viewer
-const V = {img:null, boxes:[], sel:-1, dirty:false, showLab:true, showPred:true, showRaw:false, adding:false, addCls:0, drag:null,
-           s:null, tx:0, ty:0, fitS:1, cv:null, wrap:null, W:0, H:0, space:false};
-async function openImage(stem, keepEdits){
-  if (V.dirty && !keepEdits && !confirm("Bỏ các thay đổi chưa lưu?")) return;
+// ================= BƯỚC 2: xem / sửa ảnh =================
+async function openImage(stem){
+  if (V.dirty && !confirm("Ảnh hiện tại có thay đổi CHƯA LƯU. Bỏ thay đổi?")) return;
   CUR = await api("/api/image/" + encodeURIComponent(stem));
   V.boxes = (CUR.labels || []).filter(b => !b.error).map(b => ({cls:b.cls, box:b.box.slice(), line:b.line}));
-  V.sel = -1; V.dirty = false; V.s = null;          // ảnh mới: về "vừa khung"
-  document.querySelectorAll("#list .item").forEach(n => n.classList.toggle("sel", n.dataset.stem === stem));
-  const img = new Image(); img.onload = () => { V.img = img; renderViewer(); }; img.src = "/img/" + encodeURIComponent(stem) + "?t=" + Date.now();
+  V.sel = -1; V.dirty = false; V.focus = null; V.done = new Set(); V.tool = "select";
+  document.querySelectorAll("#list .it").forEach(n => n.classList.toggle("sel", n.dataset.stem === stem));
+  const img = new Image();
+  img.onload = () => { V.img = img; buildViewer(); };
+  img.src = "/img/" + encodeURIComponent(stem) + "?t=" + Date.now();
 }
-function renderViewer(){
+function buildViewer(){
   const vw = $("#viewer"); vw.replaceChildren();
-  const cls = S.classes, col = CLS_COLORS();
-  const canEdit = CUR.in_ds && CUR.paused;
-  const tog = (key, label) => el("button",{class: V[key] ? "on" : "", onclick:() => { V[key] = !V[key]; renderViewer(); }, text:label});
-  const clsSel = el("select",{onchange:e => V.addCls = +e.target.value}); cls.forEach((c,i) => clsSel.append(el("option",{value:i, text:c, selected: i === V.addCls ? "" : false})));
-  const tb = el("div",{class:"toolbar"},
-    el("b",{text:CUR.image}), CUR.queue ? el("span",{class:"chip",text:`hàng đợi #${CUR.queue.rank} · ưu tiên ${CUR.queue.priority}`}) : null,
-    el("span",{class:"sep"}), tog("showLab","Nhãn hiện tại"), tog("showPred","Model yolo26l"), tog("showRaw","Nhãn gốc (raw)"),
-    el("span",{class:"sep"}),
-    el("button",{title:"Thu nhỏ (−)", onclick:() => zoomBy(1/1.25), text:"−"}),
-    el("span",{class:"zoomlbl", id:"zoomLbl"}),
+  const ed = CUR.can_edit;
+  const clsSel = el("select",{id:"addCls", title:"Lớp cho box mới", onchange:e => V.addCls = +e.target.value}, S.classes.map((c,i) => el("option",{value:i, text:cnameVi(i), selected: i === V.addCls})));
+  vw.append(el("div",{class:"vtool"},
+    ed ? el("button",{id:"tSel", title:"Chọn / di chuyển / đổi cỡ box (Esc)", onclick:() => setTool("select"), text:"✋ Chọn"}) : null,
+    ed ? el("button",{id:"tDraw", title:"Vẽ box mới (D)", onclick:() => setTool("draw"), text:"✏️ Vẽ box"}) : null,
+    ed ? clsSel : null, ed ? el("span",{class:"sep"}) : null,
+    el("button",{id:"tPred", title:"Hiện/ẩn gợi ý của model", onclick:() => { V.showPred = !V.showPred; updateTools(); draw(); }, text:"Gợi ý model"}),
+    el("button",{id:"tRaw", title:"Hiện/ẩn nhãn gốc trước khi máy sửa", onclick:() => { V.showRaw = !V.showRaw; updateTools(); draw(); }, text:"Nhãn gốc"}),
+    el("span",{style:"flex:1"}),
+    el("button",{title:"Thu nhỏ (−)", onclick:() => zoomBy(1/1.25), text:"−"}), el("span",{class:"zl", id:"zl"}),
     el("button",{title:"Phóng to (+)", onclick:() => zoomBy(1.25), text:"+"}),
-    el("button",{title:"Đúng điểm ảnh (1)", onclick:() => zoomTo(1), text:"100%"}),
-    el("button",{title:"Vừa khung (0 / double-click)", onclick:fitView, text:"⤢ Vừa khung"}));
-  if (canEdit) tb.append(el("span",{class:"sep"}),
-    el("button",{class: V.adding ? "on" : "", onclick:() => { V.adding = !V.adding; renderViewer(); }, text:"＋ Vẽ box"}), clsSel,
-    el("button",{disabled: V.sel < 0, onclick: delSel, text:"🗑 Xoá box"}),
-    el("button",{class:"primary", disabled: !V.dirty, onclick: save, text:"💾 Lưu nhãn"}),
-    el("button",{disabled: !V.dirty, onclick:() => { V.dirty = false; openImage(CUR.image, true); }, text:"↺ Huỷ"}));
-  vw.append(tb);
-  if (!CUR.in_ds) vw.append(el("div",{class:"banner",text:"Ảnh này đã bị loại ở cửa vào: " + CUR.intake.map(i => `${i.code} — ${i.message}`).join("; ")}));
-  else if (!CUR.paused) vw.append(el("div",{class:"hint",style:"margin-bottom:6px",text:"Chỉ xem. Muốn sửa nhãn: bấm “Chạy & dừng ở hàng đợi” rồi mở lại ảnh."}));
-  const cv = el("canvas"); const wrap = el("div",{class:"canvaswrap" + (V.adding && canEdit ? " adding" : "")}, cv); vw.append(wrap);
-  const W = V.img.naturalWidth, H = V.img.naturalHeight; cv.width = W; cv.height = H;
-  cv.style.width = W + "px"; cv.style.height = H + "px";
-  V.cv = cv; V.wrap = wrap; V.W = W; V.H = H;
-  sizeWrap(); if (V.s == null) fitView(); else applyView();
-  bindCanvas(cv, W, H); draw(cv);
-  vw.append(el("div",{class:"legend"}, ...cls.map((c,i) => el("span",{}, el("span",{class:"sw",style:`background:${col[i]}`}), c)),
-    el("span",{text:"— nét liền: nhãn · - - nét đứt: model (conf ≥ ngưỡng đậm, dưới ngưỡng mờ) · ⋯ xám: nhãn gốc · khung đỏ dày: dòng bị cờ"}),
-    el("span",{}, "Lăn chuột: zoom · kéo vùng trống / chuột giữa / ", el("kbd",{text:"Space"}), "+kéo: di chuyển · ", el("kbd",{text:"0"}), " vừa khung · ", el("kbd",{text:"1"}), " 100% · ",
-      el("kbd",{text:"J"}), "/", el("kbd",{text:"K"}), " ảnh sau/trước", canEdit ? " · " : "", canEdit ? el("kbd",{text:"Del"}) : null, canEdit ? " xoá box · " : "", canEdit ? el("kbd",{text:"Ctrl+S"}) : null, canEdit ? " lưu" : "")));
-  // panels
-  const issues = el("div");
-  const showIss = (arr, title) => { issues.append(el("h2",{text:title,style:"margin-top:4px"}));
-    if (!arr.length) issues.append(el("div",{class:"hint",text:"Không có."}));
-    for (const i of arr) issues.append(el("div",{class:"iss"}, el("span",{class:"sev " + i.severity, text: i.severity === "error" ? "bắt buộc" : "cảnh báo"}), " ", el("code",{text:i.code}), i.line ? ` dòng ${i.line} · ` : " · ", i.message)); };
-  showIss(CUR.issues_latest, CUR.latest_name.startsWith("07") ? "Cờ hiện tại (v3, sau duyệt)" : "Cờ hiện tại (v2, sau máy sửa)");
-  if (CUR.fixes.length){ issues.append(el("h2",{text:"Máy đã sửa",style:"margin-top:12px"})); for (const f of CUR.fixes) issues.append(el("div",{class:"iss"}, el("code",{text:f.action}), f.line ? ` dòng ${f.line}: ` : ": ", el("code",{text:f.before || "∅"}), " → ", el("code",{text:f.after || "∅"}))); }
-  const bt = el("tbody");
-  V.boxes.forEach((b,i) => {
-    const sel = el("select",{disabled: !canEdit, onchange:e => { b.cls = +e.target.value; V.dirty = true; renderViewer(); }});
-    cls.forEach((c,k) => sel.append(el("option",{value:k, text:c, selected: k === b.cls ? "" : false})));
-    const flagged = flaggedLines().has(b.line);
-    bt.append(el("tr",{class:"boxrow" + (i === V.sel ? " sel" : ""), onclick:() => { V.sel = i; renderViewer(); }},
-      el("td",{class:"num",text: b.line ?? "mới"}), el("td",{}, sel),
-      el("td",{class:"num",text:`${Math.round(b.box[2]*W)}×${Math.round(b.box[3]*H)}`}), el("td",{text: flagged ? "⚑" : ""})));
-  });
-  const broken = (CUR.labels || []).filter(b => b.error);
-  const boxes = el("div", {}, el("h2",{text:`Box nhãn (${V.boxes.length})` + (CUR.labels === null && CUR.in_ds ? " — ảnh CHƯA có file nhãn" : "")}),
-    el("table",{}, el("thead",{}, el("tr",{}, el("th",{class:"num",text:"dòng"}), el("th",{text:"lớp"}), el("th",{class:"num",text:"px"}), el("th",{text:""}))), bt),
-    broken.length ? el("div",{class:"hint",text:"Dòng hỏng (bị bỏ qua): " + broken.map(b => `${b.line}: ${b.text}`).join(" | ")}) : null);
-  vw.append(el("div",{class:"cols2"}, issues, boxes));
+    el("button",{title:"Vừa khung (0)", onclick:fitView, text:"⤢"})));
+  const cv = el("canvas"), wrap = el("div",{class:"wrap"}, cv); vw.append(wrap);
+  const col = COLORS();
+  vw.append(el("div",{class:"legend"}, S.classes.map((c,i) => el("span",{}, el("span",{class:"sw", style:`background:${col[i]}`}), cnameVi(i))),
+    el("span",{text:"Nét liền = nhãn · nét đứt = model gợi ý · khung vàng = chỗ đang xem"}),
+    el("span",{}, "Lăn chuột: zoom · kéo: di chuyển ảnh · ", el("kbd",{text:"J"}), "/", el("kbd",{text:"K"}), " ảnh sau/trước")));
+  V.cv = cv; V.wrap = wrap; V.W = V.img.naturalWidth; V.H = V.img.naturalHeight;
+  cv.width = V.W; cv.height = V.H; cv.style.width = V.W + "px"; cv.style.height = V.H + "px";
+  bindCanvas(); sizeWrap(); fitView(); updateTools(); renderSide();
 }
-function flaggedLines(){ return V.dirty ? new Set() : new Set(CUR.issues_latest.filter(i => i.line).map(i => i.line)); }
-function draw(cv){
-  const ctx = cv.getContext("2d"), W = cv.width, H = cv.height, col = CLS_COLORS(), px = 1 / (V.s || 1), lw = 2 * px;   // px = 1 điểm ảnh màn hình
-  const thr = +$("#conf").value;
-  ctx.drawImage(V.img, 0, 0);
-  const rect = (b) => [(b[0]-b[2]/2)*W, (b[1]-b[3]/2)*H, b[2]*W, b[3]*H];
-  const tag = (x, y, text, color) => { ctx.font = `${12*px}px system-ui`; const tw = ctx.measureText(text).width + 6*px, th = 16*px;
-    ctx.fillStyle = color; ctx.fillRect(x, Math.max(0, y - th), tw, th); ctx.fillStyle = "#fff"; ctx.fillText(text, x + 3*px, Math.max(th - 4*px, y - 4*px)); };
-  if (V.showRaw && CUR.raw_labels){ ctx.setLineDash([2*lw, 2*lw]); ctx.lineWidth = lw; ctx.strokeStyle = "rgba(200,200,200,.9)";
+function setTool(t){ V.tool = t; updateTools(); }
+function updateTools(){
+  const on = (id, v) => { const b = document.getElementById(id); if (b) b.classList.toggle("on", !!v); };
+  on("tSel", V.tool === "select"); on("tDraw", V.tool === "draw"); on("tPred", V.showPred); on("tRaw", V.showRaw);
+  if (V.wrap) V.wrap.classList.toggle("draw", V.tool === "draw");
+}
+function changed(){ V.dirty = true; draw(); renderSide(); }
+
+// ---- mô tả lỗi bằng lời + nút sửa nhanh
+function findPred(ex){ return CUR.preds.find(p => p.cls === ex.cls && Math.abs(p.conf - ex.conf) < 6e-4); }
+function bestLabel(box, cls){ let bi = -1, bv = 0; V.boxes.forEach((b,i) => { if (cls != null && b.cls !== cls) return; const v = iou(b.box, box); if (v > bv){ bv = v; bi = i; } }); return bi; }
+function byLine(line){ return V.boxes.findIndex(b => b.line === line); }
+function describe(iss, k){
+  const ex = iss.extra || {}, d = {tt:NAME[iss.code] || iss.code, sev:iss.severity, dd:iss.message, fix:null, focus:null};
+  const pr = ex.conf != null && ex.cls != null ? findPred(ex) : null;
+  switch (iss.code){
+    case "MISSING_LABEL_FILE":
+      d.dd = "Ảnh này chưa được gán nhãn. Vẽ box cho mọi ô tô, người, xe tải, xe buýt — hoặc lấy gợi ý của model làm nháp rồi chỉnh.";
+      d.fix = [["＋ Lấy gợi ý model làm nháp", () => addAllPreds()], ["Ảnh không có vật nào", () => { V.boxes = []; changed(); save(); }]]; break;
+    case "EMPTY_LABEL":
+      d.dd = "Ảnh không có box nào. Nếu ảnh thật sự không có ô tô/người/xe tải/xe buýt thì nhãn đúng; nếu có thì phải vẽ.";
+      d.fix = CUR.preds.length ? [["＋ Lấy gợi ý model làm nháp", () => addAllPreds()]] : null; break;
+    case "POSSIBLE_MISSING":
+      d.dd = `Model thấy một ${cnameVi(ex.cls)} (tin ${pct(ex.conf)}) ở khung đỏ nhưng nhãn không có box ở đó.`;
+      d.focus = ex.box; if (ex.box) d.fix = [[`＋ Thêm box ${cname(ex.cls)} theo gợi ý`, () => { V.boxes.push({cls:ex.cls, box:ex.box.slice(), line:null}); V.sel = V.boxes.length - 1; return true; }]]; break;
+    case "POSSIBLE_WRONG_CLASS": {
+      const t = pr ? bestLabel(pr.box, ex.label_cls) : -1;
+      d.dd = `Nhãn ghi ${cnameVi(ex.label_cls)} nhưng model thấy ${cnameVi(ex.cls)} (tin ${pct(ex.conf)}).`;
+      d.focus = pr && pr.box; if (t >= 0) d.fix = [[`Đổi thành ${cname(ex.cls)}`, () => { V.boxes[t].cls = ex.cls; V.sel = t; return true; }]]; break; }
+    case "POSSIBLE_LOOSE_BOX": {
+      const t = pr ? bestLabel(pr.box, ex.cls) : -1;
+      d.dd = `Box ${cnameVi(ex.cls)} không ôm sát vật (chỉ khớp ${pct(ex.iou)} với box của model).`;
+      d.focus = pr && pr.box; if (t >= 0) d.fix = [["Dùng box của model", () => { V.boxes[t].box = pr.box.slice(); V.sel = t; return true; }]]; break; }
+    case "POSSIBLE_FALSE_POS": {
+      const t = byLine(iss.line);
+      d.dd = `Box ${t >= 0 ? cnameVi(V.boxes[t].cls) : ""} không khớp vật nào model thấy — có thể vẽ nhầm chỗ hoặc thừa. Nếu đúng là có vật thì giữ nguyên.`;
+      d.focus = t >= 0 ? V.boxes[t].box : null; if (t >= 0) d.fix = [["Xoá box này", () => { V.boxes.splice(t, 1); V.sel = -1; return true; }]]; break; }
+    case "BOX_TINY": {
+      const t = byLine(iss.line); d.dd = "Box rất nhỏ (cạnh ngắn dưới 12 px). Vật quá nhỏ thì theo quy ước không gán."; d.focus = t >= 0 ? V.boxes[t].box : null;
+      if (t >= 0) d.fix = [["Xoá box này", () => { V.boxes.splice(t, 1); V.sel = -1; return true; }]]; break; }
+    case "BOX_HUGE": { const t = byLine(iss.line); d.dd = "Box gần như phủ kín ảnh — kiểm lại xem có đúng một vật không."; d.focus = t >= 0 ? V.boxes[t].box : null; break; }
+    case "DENSE_IMAGE": d.dd = "Ảnh có rất nhiều box — dễ sót hoặc lặp; xem kỹ."; break;
+    case "CLASS_RARE": d.dd = "Lớp này có rất ít mẫu trong cả lô (thống kê chung, không cần sửa trên ảnh này)."; break;
+  }
+  if (d.fix) d.fix = d.fix.map(([label, fn]) => [label, () => { const r = fn(); if (r !== false){ V.done.add(k); changed(); } }]);
+  return d;
+}
+function addAllPreds(){
+  const thr = S.thresholds.conf; let n = 0;
+  for (const p of CUR.preds) if (p.conf >= thr && !V.boxes.some(b => iou(b.box, p.box) > 0.5)){ V.boxes.push({cls:p.cls, box:p.box.slice(), line:null}); n++; }
+  toast(n ? `Đã thêm ${n} box từ gợi ý — kiểm lại rồi bấm Lưu` : "Model không có gợi ý đủ tin cậy cho ảnh này"); changed();
+}
+function renderSide(){
+  const sd = $("#side"); sd.replaceChildren();
+  const ed = CUR.can_edit, unl = CUR.in_ds && CUR.labels === null && !V.dirty;
+  const badge = CUR.status === "edited" ? el("span",{class:"badge ed",text:"✎ đã sửa"}) : CUR.status === "confirmed" ? el("span",{class:"badge ok",text:"✓ nhãn đúng"}) : el("span",{class:"badge todo",text:"chưa xem"});
+  sd.append(el("h3",{}, el("span",{text:CUR.image + (CUR.queue ? `  ·  #${CUR.queue.rank}` : "")}), CUR.in_ds ? badge : null));
+  if (!CUR.in_ds){ sd.append(el("div",{class:"banner err", text:"Ảnh đã bị loại ngay từ đầu: " + CUR.intake.map(i => NAME[i.code] || i.code).join(", ") + "."}), el("div",{class:"muted small", text:CUR.intake.map(i => i.message).join("; ")})); return; }
+
+  sd.append(el("div",{class:"small muted", style:"margin-bottom:6px", text: CUR.issues.length ? "Máy nghi ngờ:" : "Máy không thấy gì đáng ngờ ở ảnh này."}));
+  CUR.issues.forEach((iss, k) => {
+    const d = describe(iss, k), done = V.done.has(k);
+    sd.append(el("div",{class:"iss" + (done ? " done" : "")},
+      el("div",{class:"tt " + (d.sev === "error" ? "e" : "w"), text:(done ? "✓ " : "") + d.tt}),
+      el("div",{class:"dd", text:d.dd}),
+      el("div",{class:"acts"},
+        d.focus ? el("button",{onclick:() => { V.focus = d.focus; zoomToBox(d.focus); }, text:"🔎 Xem chỗ này"}) : null,
+        ed && d.fix && !done ? d.fix.map(([label, fn]) => el("button",{class:"primary", onclick:fn, text:label})) : null)));
+  });
+  if (CUR.fixes.length) sd.append(el("div",{class:"info", text:"Máy đã tự sửa trước đó: " + CUR.fixes.map(f => ({drop_line:`xoá dòng ${f.line} (hỏng)`, clip_box:`cắt box dòng ${f.line} cho vừa ảnh`, needs_label:"chuyển ảnh cho người gán", remove_image:"loại ảnh", rename_classes:"sửa tên lớp"})[f.action] || f.action).join("; ") + "."}));
+
+  // bảng box
+  const tb = el("tbody");
+  V.boxes.forEach((b, i) => tb.append(el("tr",{class: i === V.sel ? "sel" : "", onclick:e => { if (e.target.tagName === "SELECT" || e.target.tagName === "BUTTON") return; V.sel = i; V.focus = null; draw(); renderSide(); }},
+    el("td",{}, el("span",{class:"sw", style:`background:${COLORS()[b.cls]}`})),
+    el("td",{}, ed ? el("select",{onchange:e => { b.cls = +e.target.value; V.sel = i; changed(); }}, S.classes.map((c,k) => el("option",{value:k, text:cnameVi(k), selected:k === b.cls}))) : cnameVi(b.cls)),
+    el("td",{class:"muted", text:`${Math.round(b.box[2]*V.W)}×${Math.round(b.box[3]*V.H)}`}),
+    el("td",{}, ed ? el("button",{class:"ghost danger", title:"Xoá box (Del)", onclick:() => { V.boxes.splice(i,1); V.sel = -1; changed(); }, text:"✕"}) : null))));
+  sd.append(el("div",{class:"small", style:"margin-top:12px"}, el("b",{text:`Box trên ảnh (${V.boxes.length})`}),
+    ed ? el("span",{class:"muted", text:" · bấm box để chọn, kéo để di chuyển, kéo góc để đổi cỡ"}) : null),
+    el("table",{class:"boxes"}, tb));
+
+  if (!ed){ return; }
+  // nút hành động chính
+  const acts = el("div",{class:"actions"});
+  if (V.dirty){
+    acts.append(el("button",{class:"primary big", onclick:() => save(true), html:"💾 Lưu &amp; sang ảnh tiếp <kbd>Enter</kbd>"}),
+      el("div",{class:"two"}, el("button",{onclick:() => save(false), text:"Lưu"}), el("button",{onclick:() => { V.dirty = false; openImage(CUR.image); }, text:"↺ Huỷ thay đổi"})));
+  } else if (unl){
+    acts.append(el("div",{class:"banner err", text:"Ảnh chưa có nhãn — phải vẽ box (hoặc chọn “Ảnh không có vật nào”) rồi lưu."}),
+      el("button",{onclick:() => nextImage(1), text:"Bỏ qua, xem ảnh khác →"}));
+  } else if (CUR.status === "confirmed"){
+    acts.append(el("button",{class:"big", onclick:() => nextImage(1), html:"Sang ảnh tiếp → <kbd>J</kbd>"}),
+      el("button",{class:"ghost", onclick:() => confirmImg(false), text:"Bỏ đánh dấu “nhãn đúng”"}));
+  } else {
+    acts.append(el("button",{class:"primary big", onclick:() => confirmImg(true), html:"✓ Nhãn đúng — sang ảnh tiếp <kbd>Enter</kbd>"}),
+      el("div",{class:"muted small", text:"Nhãn có chỗ sai? Dùng nút sửa nhanh ở trên, hoặc sửa trực tiếp trên ảnh rồi Lưu."}),
+      el("button",{onclick:() => nextImage(1), text:"Bỏ qua (chưa quyết) →"}));
+  }
+  sd.append(acts);
+}
+async function save(next){
+  try {
+    const r = await post("/api/labels/" + encodeURIComponent(CUR.image), {boxes: V.boxes.map(b => ({cls:b.cls, box:b.box}))});
+    V.dirty = false; toast(`Đã lưu ${CUR.image} — đã duyệt ${r.reviewed}/${r.budget} ảnh`);
+    const stem = CUR.image; await load();
+    if (next) nextImage(1); else openImage(stem);
+  } catch (e) { toast("Không lưu được: " + e.message); }
+}
+async function confirmImg(ok){
+  try {
+    const r = await post("/api/confirm/" + encodeURIComponent(CUR.image), {ok});
+    toast(ok ? `Đã xác nhận nhãn đúng — đã duyệt ${r.reviewed}/${S.budget} ảnh` : "Đã bỏ đánh dấu");
+    const stem = CUR.image; await load();
+    if (ok) nextImage(1); else openImage(stem);
+  } catch (e) { toast(e.message); }
+}
+
+// ---- vẽ
+function draw(){
+  const cv = V.cv; if (!cv) return;
+  const ctx = cv.getContext("2d"), W = V.W, H = V.H, col = COLORS(), px = 1 / V.s, lw = 2 * px;
+  const rect = b => [(b[0]-b[2]/2)*W, (b[1]-b[3]/2)*H, b[2]*W, b[3]*H];
+  const tag = (x, y, text, color, below) => { ctx.font = `600 ${12*px}px system-ui`; const tw = ctx.measureText(text).width + 8*px, th = 17*px;
+    const ty = below ? y : Math.max(0, y - th); ctx.fillStyle = color; ctx.fillRect(x, ty, tw, th); ctx.fillStyle = "#fff"; ctx.fillText(text, x + 4*px, ty + th - 5*px); };
+  ctx.setLineDash([]); ctx.globalAlpha = 1; ctx.drawImage(V.img, 0, 0);
+  if (V.showRaw && CUR.raw_labels){ ctx.setLineDash([2*px, 3*px]); ctx.lineWidth = 1.5*px; ctx.strokeStyle = "rgba(220,220,220,.95)";
     for (const b of CUR.raw_labels) if (!b.error) ctx.strokeRect(...rect(b.box)); }
-  if (V.showPred){ ctx.setLineDash([6*px, 4*px]);
-    for (const p of CUR.preds){ ctx.globalAlpha = p.conf >= thr ? 1 : .35; ctx.lineWidth = lw; ctx.strokeStyle = col[p.cls] || "#fff"; const r = rect(p.box); ctx.strokeRect(...r);
-      if (p.conf >= thr) tag(r[0], r[1] + r[3], `${S.classes[p.cls]} ${p.conf.toFixed(2)}`, col[p.cls]); }
-    ctx.globalAlpha = 1;
-    for (const i of CUR.issues_latest) if (i.code === "POSSIBLE_MISSING" && i.extra.box){ ctx.setLineDash([3*lw, 2*lw]); ctx.lineWidth = lw*2; ctx.strokeStyle = "#ff3b3b"; const r = rect(i.extra.box); ctx.strokeRect(...r); tag(r[0], r[1], "thiếu?", "#ff3b3b"); }
+  if (V.showPred){
+    const thr = S.thresholds.conf; ctx.setLineDash([6*px, 4*px]);
+    for (const p of CUR.preds){ if (p.conf < thr) continue; ctx.lineWidth = 2*px; ctx.strokeStyle = col[p.cls] || "#fff"; const r = rect(p.box); ctx.strokeRect(...r);
+      if (r[2] > 40*px){ ctx.globalAlpha = .8; ctx.setLineDash([]); tag(Math.max(r[0], r[0] + r[2] - 90*px), r[1] + r[3], "gợi ý: " + cname(p.cls), col[p.cls], true); ctx.globalAlpha = 1; ctx.setLineDash([6*px, 4*px]); } }
+    for (const i of CUR.issues) if (i.code === "POSSIBLE_MISSING" && i.extra.box){ ctx.setLineDash([5*px, 3*px]); ctx.lineWidth = 3*px; ctx.strokeStyle = "#ff3b3b"; const r = rect(i.extra.box); ctx.strokeRect(...r); tag(r[0], r[1]+r[3], "thiếu? " + cname(i.extra.cls), "#e02424", true); }
   }
   ctx.setLineDash([]);
-  if (V.showLab){ const fl = flaggedLines();
-    V.boxes.forEach((b,i) => { const r = rect(b.box); ctx.lineWidth = i === V.sel ? lw*2.5 : lw; ctx.strokeStyle = col[b.cls];
-      if (fl.has(b.line)){ ctx.save(); ctx.lineWidth = lw*4; ctx.strokeStyle = "rgba(255,40,40,.55)"; ctx.strokeRect(...r); ctx.restore(); }
-      ctx.strokeRect(...r); tag(r[0], r[1], (b.line ? b.line + ":" : "") + S.classes[b.cls], col[b.cls]);
-      if (i === V.sel){ ctx.fillStyle = "#fff"; for (const [x,y] of corners(r)) ctx.fillRect(x - lw*2, y - lw*2, lw*4, lw*4); } });
-  }
-  if (V.drag && V.drag.kind === "new"){ const d = V.drag; ctx.setLineDash([4*px,3*px]); ctx.lineWidth = lw; ctx.strokeStyle = col[V.addCls];
+  V.boxes.forEach((b, i) => { const r = rect(b.box), sel = i === V.sel;
+    ctx.lineWidth = sel ? 3.5*px : lw; ctx.strokeStyle = col[b.cls]; ctx.strokeRect(...r); tag(r[0], r[1], cname(b.cls), col[b.cls]);
+    if (sel){ ctx.fillStyle = "#fff"; ctx.strokeStyle = col[b.cls]; ctx.lineWidth = 1.5*px; for (const [x,y] of corners(r)){ ctx.fillRect(x-5*px, y-5*px, 10*px, 10*px); ctx.strokeRect(x-5*px, y-5*px, 10*px, 10*px); } } });
+  if (V.focus){ ctx.setLineDash([8*px, 5*px]); ctx.lineWidth = 3*px; ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--focus").trim(); const r = rect(V.focus); ctx.strokeRect(r[0]-6*px, r[1]-6*px, r[2]+12*px, r[3]+12*px); ctx.setLineDash([]); }
+  if (V.drag && V.drag.kind === "new"){ const d = V.drag; ctx.setLineDash([5*px, 3*px]); ctx.lineWidth = 2*px; ctx.strokeStyle = col[V.addCls];
     ctx.strokeRect(Math.min(d.x0,d.x1), Math.min(d.y0,d.y1), Math.abs(d.x1-d.x0), Math.abs(d.y1-d.y0)); ctx.setLineDash([]); }
 }
 const corners = r => [[r[0],r[1]],[r[0]+r[2],r[1]],[r[0],r[1]+r[3]],[r[0]+r[2],r[1]+r[3]]];
-// ---------- zoom / pan (canvas vẽ ở độ phân giải gốc; CSS transform = translate(tx,ty) scale(s))
-function sizeWrap(){
-  const w = V.wrap.clientWidth || 600, h = Math.max(260, Math.min(window.innerHeight * 0.72, w * V.H / V.W));
-  V.wrap.style.height = h + "px";
-}
-function applyView(){
-  if (!V.cv) return;
-  V.cv.style.transform = `translate(${V.tx}px,${V.ty}px) scale(${V.s})`;
-  const lbl = document.getElementById("zoomLbl"); if (lbl) lbl.textContent = Math.round(V.s * 100) + "%";
-}
-function fitView(){
-  if (!V.wrap) return;
-  const ww = V.wrap.clientWidth, wh = V.wrap.clientHeight;
-  V.fitS = Math.min(ww / V.W, wh / V.H); V.s = V.fitS;
-  V.tx = (ww - V.W * V.s) / 2; V.ty = (wh - V.H * V.s) / 2;
-  applyView(); if (V.cv) draw(V.cv);
-}
-function zoomAt(mx, my, newS){                       // giữ nguyên điểm ảnh dưới con trỏ (mx,my: toạ độ trong khung)
-  newS = Math.max(V.fitS * 0.5, Math.min(newS, 12));
-  const ix = (mx - V.tx) / V.s, iy = (my - V.ty) / V.s;
-  V.s = newS; V.tx = mx - ix * V.s; V.ty = my - iy * V.s;
-  applyView(); draw(V.cv);
-}
-function zoomBy(f){ if (V.wrap) zoomAt(V.wrap.clientWidth / 2, V.wrap.clientHeight / 2, V.s * f); }
-function zoomTo(s){ if (V.wrap) zoomAt(V.wrap.clientWidth / 2, V.wrap.clientHeight / 2, s); }
-window.addEventListener("resize", () => { if (V.wrap && document.body.contains(V.wrap)){ sizeWrap(); fitView(); } });
 
-function bindCanvas(cv, W, H){
-  const wrap = V.wrap;
+// ---- zoom / pan
+function sizeWrap(){ const w = V.wrap.clientWidth || 600; V.wrap.style.height = Math.max(300, Math.min(window.innerHeight - 220, w * V.H / V.W)) + "px"; }
+function applyView(){ V.cv.style.transform = `translate(${V.tx}px,${V.ty}px) scale(${V.s})`; const z = $("#zl"); if (z) z.textContent = Math.round(V.s * 100) + "%"; }
+function fitView(){ if (!V.wrap) return; const ww = V.wrap.clientWidth, wh = V.wrap.clientHeight;
+  V.fitS = Math.min(ww / V.W, wh / V.H); V.s = V.fitS; V.tx = (ww - V.W*V.s)/2; V.ty = (wh - V.H*V.s)/2; applyView(); draw(); }
+function zoomAt(mx, my, ns){ ns = Math.max(V.fitS*0.5, Math.min(ns, 12)); const ix = (mx - V.tx)/V.s, iy = (my - V.ty)/V.s; V.s = ns; V.tx = mx - ix*ns; V.ty = my - iy*ns; applyView(); draw(); }
+function zoomBy(f){ if (V.wrap) zoomAt(V.wrap.clientWidth/2, V.wrap.clientHeight/2, V.s*f); }
+function zoomToBox(b){
+  if (!V.wrap) return; const ww = V.wrap.clientWidth, wh = V.wrap.clientHeight;
+  const ns = Math.max(V.fitS, Math.min(6, Math.min(ww / (b[2]*V.W*2.2), wh / (b[3]*V.H*2.2))));
+  V.s = ns; V.tx = ww/2 - b[0]*V.W*ns; V.ty = wh/2 - b[1]*V.H*ns; applyView(); draw();
+}
+window.addEventListener("resize", () => { if (V.wrap && document.body.contains(V.wrap) && STEP === 2){ sizeWrap(); fitView(); } });
+
+function bindCanvas(){
+  const wrap = V.wrap, cv = V.cv, W = V.W, H = V.H;
   const pos = e => { const b = cv.getBoundingClientRect(); return [(e.clientX - b.left) * W / b.width, (e.clientY - b.top) * H / b.height, W / b.width]; };
-  wrap.addEventListener("wheel", e => {
-    e.preventDefault();
-    const b = wrap.getBoundingClientRect();
-    zoomAt(e.clientX - b.left, e.clientY - b.top, V.s * Math.pow(1.0015, -e.deltaY));
-  }, {passive:false});
-  wrap.addEventListener("contextmenu", e => e.preventDefault());
-  wrap.addEventListener("dblclick", e => { if (!V.adding) fitView(); });
-  wrap.addEventListener("mousedown", e => {
-    const startPan = (viaSpace) => { V.drag = {kind:"pan", cx:e.clientX, cy:e.clientY, tx0:V.tx, ty0:V.ty, moved:false, button:e.button, viaSpace}; wrap.classList.add("panning"); };
-    if (e.button === 1 || e.button === 2 || V.space){ e.preventDefault(); startPan(true); return; }
-    if (e.button !== 0) return;
-    if (hit(e) === "empty") startPan();
-  });
-  const toXYXY = b => [(b[0]-b[2]/2)*W, (b[1]-b[3]/2)*H, (b[0]+b[2]/2)*W, (b[1]+b[3]/2)*H];
-  const fromXYXY = (x1,y1,x2,y2) => { x1 = Math.max(0,Math.min(W,x1)); x2 = Math.max(0,Math.min(W,x2)); y1 = Math.max(0,Math.min(H,y1)); y2 = Math.max(0,Math.min(H,y2));
+  const toXY = b => [(b[0]-b[2]/2)*W, (b[1]-b[3]/2)*H, (b[0]+b[2]/2)*W, (b[1]+b[3]/2)*H];
+  V.pos = pos;
+  V.fromXY = (x1,y1,x2,y2) => { const cl = (v,m) => Math.max(0, Math.min(m, v)); x1 = cl(x1,W); x2 = cl(x2,W); y1 = cl(y1,H); y2 = cl(y2,H);
     const [a,b,c,d] = [Math.min(x1,x2), Math.min(y1,y2), Math.max(x1,x2), Math.max(y1,y2)]; return [(a+c)/2/W, (b+d)/2/H, (c-a)/W, (d-b)/H]; };
-  const editable = CUR.in_ds && CUR.paused;
-  V.pos = pos; V.fromXYXY = fromXYXY;
-  // trả về "empty" nếu bấm vào chỗ không có box (=> kéo để di chuyển ảnh; nhả mà không kéo => bỏ chọn)
-  const hit = e => {
-    const [x, y, k] = pos(e), tol = 8 * k;
-    if (editable && V.sel >= 0){
-      const q = toXYXY(V.boxes[V.sel].box), cs = [[q[0],q[1]],[q[2],q[1]],[q[0],q[3]],[q[2],q[3]]];
+  wrap.addEventListener("wheel", e => { e.preventDefault(); const b = wrap.getBoundingClientRect(); zoomAt(e.clientX - b.left, e.clientY - b.top, V.s * Math.pow(1.0015, -e.deltaY)); }, {passive:false});
+  wrap.addEventListener("contextmenu", e => e.preventDefault());
+  wrap.addEventListener("dblclick", () => { if (V.tool !== "draw") fitView(); });
+  wrap.addEventListener("mousedown", e => {
+    const pan = () => { V.drag = {kind:"pan", cx:e.clientX, cy:e.clientY, tx0:V.tx, ty0:V.ty, moved:false, btn:e.button}; wrap.classList.add("panning"); };
+    if (e.button === 1 || e.button === 2 || V.space){ e.preventDefault(); pan(); V.drag.force = true; return; }
+    if (e.button !== 0) return;
+    const [x, y, k] = pos(e), tol = 9 * k, ed = CUR.can_edit;
+    if (ed && V.tool === "draw"){ V.drag = {kind:"new", x0:x, y0:y, x1:x, y1:y}; return; }
+    if (ed && V.sel >= 0){
+      const q = toXY(V.boxes[V.sel].box), cs = [[q[0],q[1]],[q[2],q[1]],[q[0],q[3]],[q[2],q[3]]];
       const ci = cs.findIndex(([cx,cy]) => Math.abs(cx-x) < tol && Math.abs(cy-y) < tol);
       if (ci >= 0){ V.drag = {kind:"resize", ci, q}; return; }
-      if (x > q[0] && x < q[2] && y > q[1] && y < q[3] && !V.adding){ V.drag = {kind:"move", x0:x, y0:y, q}; return; }
+      if (x > q[0] && x < q[2] && y > q[1] && y < q[3]){ V.drag = {kind:"move", x0:x, y0:y, q}; return; }
     }
-    if (editable && V.adding){ V.drag = {kind:"new", x0:x, y0:y, x1:x, y1:y}; return; }
-    // box nhỏ nhất chứa điểm click
     let best = -1, area = Infinity;
-    V.boxes.forEach((b,i) => { const q = toXYXY(b.box); if (V.showLab && x > q[0] && x < q[2] && y > q[1] && y < q[3] && b.box[2]*b.box[3] < area){ area = b.box[2]*b.box[3]; best = i; } });
-    if (editable && best >= 0){ V.sel = best; renderViewer(); return; }   // đang sửa: chọn ngay để kéo tiếp
-    V.pendingSel = best; return "empty";                                   // chỉ xem: kéo = di chuyển; bấm không kéo = chọn
-  };
+    V.boxes.forEach((b,i) => { const q = toXY(b.box); if (x > q[0] && x < q[2] && y > q[1] && y < q[3] && b.box[2]*b.box[3] < area){ area = b.box[2]*b.box[3]; best = i; } });
+    if (ed && best >= 0){ V.sel = best; V.focus = null; draw(); renderSide(); const q = toXY(V.boxes[best].box); V.drag = {kind:"move", x0:x, y0:y, q}; return; }
+    V.pendingSel = best; pan();
+  });
 }
-// kéo chuột theo dõi trên cả cửa sổ (không mất khi con trỏ ra khỏi khung)
 window.addEventListener("mousemove", e => {
   const d = V.drag; if (!d || !V.cv) return;
-  if (d.kind === "pan"){
-    const dx = e.clientX - d.cx, dy = e.clientY - d.cy;
-    if (Math.abs(dx) + Math.abs(dy) > 3) d.moved = true;
-    V.tx = d.tx0 + dx; V.ty = d.ty0 + dy; applyView(); return;
-  }
+  if (d.kind === "pan"){ const dx = e.clientX - d.cx, dy = e.clientY - d.cy; if (Math.abs(dx) + Math.abs(dy) > 3) d.moved = true; V.tx = d.tx0 + dx; V.ty = d.ty0 + dy; applyView(); return; }
   const [x, y] = V.pos(e);
   if (d.kind === "new"){ d.x1 = x; d.y1 = y; }
-  else if (d.kind === "move"){ const dx = x - d.x0, dy = y - d.y0; V.boxes[V.sel].box = V.fromXYXY(d.q[0]+dx, d.q[1]+dy, d.q[2]+dx, d.q[3]+dy); V.dirty = true; }
-  else if (d.kind === "resize"){ const q = d.q.slice(); if (d.ci === 0 || d.ci === 2) q[0] = x; else q[2] = x; if (d.ci < 2) q[1] = y; else q[3] = y; V.boxes[V.sel].box = V.fromXYXY(...q); V.dirty = true; }
-  draw(V.cv);
+  else if (d.kind === "move"){ const dx = x - d.x0, dy = y - d.y0; if (Math.abs(dx) + Math.abs(dy) > 1){ V.boxes[V.sel].box = V.fromXY(d.q[0]+dx, d.q[1]+dy, d.q[2]+dx, d.q[3]+dy); d.moved = true; } }
+  else if (d.kind === "resize"){ const q = d.q.slice(); if (d.ci === 0 || d.ci === 2) q[0] = x; else q[2] = x; if (d.ci < 2) q[1] = y; else q[3] = y; V.boxes[V.sel].box = V.fromXY(...q); d.moved = true; }
+  draw();
 });
 window.addEventListener("mouseup", () => {
   const d = V.drag; V.drag = null; if (!d) return;
   if (V.wrap) V.wrap.classList.remove("panning");
-  if (d.kind === "pan"){
-    if (!d.moved && d.button === 0 && !d.viaSpace){ const ns = V.pendingSel ?? -1; if (ns !== V.sel){ V.sel = ns; renderViewer(); } }
-    return;
+  if (d.kind === "pan"){ if (!d.moved && !d.force && d.btn === 0){ const ns = V.pendingSel ?? -1; if (ns !== V.sel){ V.sel = ns; V.focus = null; draw(); renderSide(); } } return; }
+  if (d.kind === "new"){ const b = V.fromXY(d.x0, d.y0, d.x1, d.y1); if (b[2]*V.W >= 4 && b[3]*V.H >= 4){ V.boxes.push({cls:V.addCls, box:b, line:null}); V.sel = V.boxes.length - 1; changed(); } else draw(); return; }
+  if (d.moved) changed();
+});
+
+// ================= BƯỚC 3 =================
+function renderS3(){
+  const vc = $("#verdict"), ec = $("#exportCard"); vc.replaceChildren(); ec.replaceChildren();
+  $("#log").textContent = S.log || "";
+  renderCodes();
+  if (!S.finished || !S.summary) return;
+  const v = S.summary.verdict, d = v.decision, hold = S.hold_ratio;
+  const title = {Release:"ĐẠT — dữ liệu sẵn sàng sử dụng", Hold:"TẠM GIỮ — chưa nên dùng chính thức", Rework:"CHƯA ĐẠT — còn lỗi phải sửa"}[d];
+  const icon = {Release:"✅", Hold:"⏸️", Rework:"❌"}[d];
+  const body = el("div");
+  if (d === "Rework"){
+    body.append(el("p",{text:`Còn ${v.n_errors} lỗi bắt buộc nên máy KHÔNG xuất dataset.`}));
+  } else {
+    body.append(el("p",{text: d === "Release"
+      ? `Không còn lỗi hỏng, và chỉ ${v.n_warn_images}/${v.n_images} ảnh (${pct(v.warn_ratio)}) còn bị nghi ngờ mà chưa ai xem — dưới ngưỡng ${pct(hold)}.`
+      : `Không còn lỗi hỏng, nhưng còn ${v.n_warn_images}/${v.n_images} ảnh (${pct(v.warn_ratio)}) máy nghi sai mà chưa ai xem — vượt ngưỡng cho phép ${pct(hold)}.`}));
+    const maxp = Math.max(v.warn_ratio, hold) * 1.5;
+    body.append(el("div",{class:"meter"}, el("div",{class:"fill", style:`width:${v.warn_ratio/maxp*100}%;background:var(${d === "Release" ? "--ok" : "--warn"})`}), el("div",{class:"mark", style:`left:${hold/maxp*100}%`})),
+      el("div",{class:"muted small", text:`Thanh = tỉ lệ ảnh còn nghi ngờ chưa xem · vạch đen = ngưỡng ${pct(hold)}`}));
   }
-  if (d.kind === "new"){ const b = V.fromXYXY(d.x0, d.y0, d.x1, d.y1); if (b[2]*V.W >= 3 && b[3]*V.H >= 3){ V.boxes.push({cls:V.addCls, box:b, line:null}); V.sel = V.boxes.length - 1; V.dirty = true; } }
-  renderViewer();
+  body.append(el("div",{class:"muted small", style:"margin-top:8px", text: S.mode === "demo"
+    ? `Người duyệt mô phỏng đã xem ${S.summary.reviewed}/${S.budget} ảnh.`
+    : `Bạn đã duyệt ${S.summary.reviewed}/${S.budget} ảnh (${S.summary.reviewed_edited ?? 0} sửa, ${S.summary.reviewed_confirmed ?? 0} xác nhận đúng).`}));
+  // việc tiếp theo
+  const nx = el("div",{class:"next"});
+  if (d === "Release"){ nx.append(el("b",{text:"Việc tiếp theo"}), el("span",{text:"Tải dataset bên dưới để dùng (train, chia sẻ…)."})); }
+  else if (d === "Rework"){
+    nx.append(el("b",{text:"Việc tiếp theo"}));
+    if (S.unlabeled.length){
+      nx.append(el("div",{text:`${S.unlabeled.length} ảnh còn chưa có nhãn. Bấm vào từng ảnh để gán (vẽ box hoặc “Ảnh không có vật nào”), rồi bấm “Xong, xem kết quả” lần nữa:`}),
+        el("div",{class:"chips"}, S.unlabeled.map(s => el("span",{class:"chip", onclick:() => { FILTER = "all"; go(2); openImage(s); }, text:s}))));
+    } else nx.append(el("div",{text:"Mở danh sách lỗi chi tiết bên dưới để xem lỗi nào còn lại."}));
+  } else {
+    const left = S.budget - S.summary.reviewed;
+    nx.append(el("b",{text:"Việc tiếp theo"}));
+    if (S.mode === "demo") nx.append(el("div",{text:`Người duyệt mô phỏng đã dùng hết ${S.budget} lượt. Muốn tự duyệt: quay lại Bước 1 và bấm “Bắt đầu kiểm tra”. Trong dự án thật, cần tăng ngân sách duyệt hoặc chấp nhận Tạm giữ.`}));
+    else if (S.need_more <= left) nx.append(el("div",{text:`Duyệt thêm ít nhất ${S.need_more} ảnh nữa (còn ${left} lượt trong ngân sách), rồi bấm “Xong, xem kết quả” lần nữa.`}),
+      el("div",{class:"row", style:"margin-top:8px"}, el("button",{class:"primary", onclick:() => { FILTER = "todo"; CUR = null; go(2); }, text:"Duyệt tiếp →"})));
+    else nx.append(el("div",{text:`Cần duyệt thêm ${S.need_more} ảnh nhưng ngân sách chỉ còn ${left} lượt — không đủ. Dự án cần tăng ngân sách duyệt, hoặc chấp nhận Tạm giữ và dùng dataset như bản nháp.`}));
+  }
+  vc.append(el("div",{class:"verdict " + d}, el("div",{class:"icon", text:icon}), el("div",{}, el("h2",{class:d, text:title}), body)), nx);
+  // xuất
+  ec.append(el("h3",{text:"Xuất dataset"}));
+  if (S.exported){
+    ec.append(el("p",{class:"muted", text: d === "Release" ? "Dataset đã sẵn sàng." : "Có thể tải để thử nghiệm, nhưng đây là BẢN NHÁP (chưa đạt để dùng chính thức)."}),
+      el("div",{class:"row"}, el("a",{href:"/api/export.zip"}, el("button",{class:"primary big", text:`⬇ Tải dataset (.zip) — ${S.n_exported} ảnh`})),
+        el("span",{class:"muted small", text:"Gồm images/, labels/ (YOLO), data.yaml, manifest.json (truy vết)."})));
+  } else ec.append(el("p",{class:"muted", text:"Chưa xuất vì kết quả là CHƯA ĐẠT. Sửa hết lỗi bắt buộc rồi xem kết quả lại."}));
+}
+function renderCodes(){
+  const box = $("#codes"); box.replaceChildren(); const st = S.stages; if (!st.v1) return;
+  const codes = [...new Set([...Object.keys(st.v1), ...Object.keys(st.v2 || {}), ...Object.keys(st.v3 || {})])];
+  const sev = c => (st.v1[c] || (st.v2 || {})[c] || (st.v3 || {})[c]).severity;
+  codes.sort((a,b) => sev(a) === sev(b) ? (NAME[a] || a).localeCompare(NAME[b] || b) : sev(a) === "error" ? -1 : 1);
+  const cell = (o, c) => { if (o == null) return el("td",{class:"n z", text:"–"}); const x = o[c]; return el("td",{class:"n" + (x ? "" : " z"), text: x ? String(x.images) : "0"}); };
+  box.append(el("p",{class:"muted small", style:"margin-top:8px", text:"Số ẢNH bị ảnh hưởng ở từng giai đoạn. “Bắt buộc” = phải hết mới đạt; “cảnh báo” = cần người xem."}),
+    el("table",{class:"codes"}, el("thead",{}, el("tr",{}, el("th",{text:"Loại lỗi"}), el("th",{text:"Mức"}), el("th",{class:"n", text:"Ban đầu"}), el("th",{class:"n", text:"Sau khi máy sửa"}), el("th",{class:"n", text:"Cuối cùng"}))),
+      el("tbody",{}, codes.map(c => el("tr",{}, el("td",{}, NAME[c] || c, el("div",{class:"muted small", text:c + (st.intake && st.intake[c] ? " · loại ngay ở cửa vào" : "")})),
+        el("td",{}, el("span",{class:"sev " + sev(c), text: sev(c) === "error" ? "bắt buộc" : "cảnh báo"})), cell(st.v1, c), cell(st.v2, c), cell(st.v3, c))))));
+}
+
+// ================= phím tắt =================
+document.addEventListener("keydown", e => {
+  if (e.code === "Space" && STEP === 2 && !e.target.matches("input,select,textarea,button")){ e.preventDefault(); V.space = true; }
+  if (e.target.matches("input,select,textarea") || STEP !== 2 || !CUR) return;
+  const ed = CUR.can_edit;
+  if (e.key === "j" || e.key === "ArrowDown"){ e.preventDefault(); nextImage(1); }
+  else if (e.key === "k" || e.key === "ArrowUp"){ e.preventDefault(); nextImage(-1); }
+  else if (e.key === "+" || e.key === "="){ zoomBy(1.25); } else if (e.key === "-"){ zoomBy(1/1.25); } else if (e.key === "0"){ fitView(); }
+  else if (!ed) return;
+  else if ((e.key === "Delete" || e.key === "Backspace") && V.sel >= 0){ e.preventDefault(); V.boxes.splice(V.sel, 1); V.sel = -1; changed(); }
+  else if (e.key === "d"){ setTool("draw"); }
+  else if (e.key === "Escape"){ setTool("select"); V.sel = -1; V.focus = null; draw(); renderSide(); }
+  else if ((e.ctrlKey || e.metaKey) && e.key === "s"){ e.preventDefault(); if (V.dirty) save(false); }
+  else if (e.key === "Enter" && !e.target.matches("button")){ e.preventDefault(); if (V.dirty) save(true); else if (CUR.status !== "confirmed" && CUR.labels !== null) confirmImg(true); else nextImage(1); }
 });
 document.addEventListener("keyup", e => { if (e.code === "Space") V.space = false; });
-function delSel(){ if (V.sel < 0) return; V.boxes.splice(V.sel, 1); V.sel = -1; V.dirty = true; renderViewer(); }
-async function save(){
-  try { const r = await api("/api/labels/" + encodeURIComponent(CUR.image), {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({boxes: V.boxes.map(b => ({cls:b.cls, box:b.box}))})});
-    V.dirty = false; toast(`Đã lưu ${CUR.image} · đã sửa ${r.edited}/${r.budget} ảnh` + (r.edited > r.budget ? " — VƯỢT ngân sách, pipeline sẽ báo lỗi" : ""));
-    await refresh(true);
-  } catch (e) { toast("Không lưu được: " + e.message); }
-}
-document.addEventListener("keydown", e => {
-  if (e.target.matches("input,select,textarea") || $("#rv").hidden) return;
-  if (e.key === "Delete" || e.key === "Backspace"){ if (CUR && CUR.paused){ e.preventDefault(); delSel(); } }
-  else if (e.key === "j" || e.key === "ArrowDown"){ e.preventDefault(); navList(1); }
-  else if (e.key === "k" || e.key === "ArrowUp"){ e.preventDefault(); navList(-1); }
-  else if ((e.ctrlKey || e.metaKey) && e.key === "s"){ e.preventDefault(); if (V.dirty) save(); }
-  else if (e.key === "Escape"){ V.adding = false; V.sel = -1; if (CUR) renderViewer(); }
-  else if (e.code === "Space"){ e.preventDefault(); V.space = true; }
-  else if (e.key === "+" || e.key === "="){ e.preventDefault(); zoomBy(1.25); }
-  else if (e.key === "-" || e.key === "_"){ e.preventDefault(); zoomBy(1/1.25); }
-  else if (e.key === "0"){ e.preventDefault(); fitView(); }
-  else if (e.key === "1"){ e.preventDefault(); zoomTo(1); }
-});
 window.addEventListener("beforeunload", e => { if (V.dirty){ e.preventDefault(); e.returnValue = ""; } });
-refresh().catch(e => toast("Không tải được trạng thái: " + e.message));
+
+load().then(() => { if (S.finished) go(3); else if (S.can_review) go(2); else go(1); }).catch(e => toast("Không tải được: " + e.message));
 </script>
 </body>
 </html>

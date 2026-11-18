@@ -1,22 +1,32 @@
-# AutoQC web: dùng pipeline kiểm nhãn qua trình duyệt
+# AutoQC web: kiểm nhãn ảnh theo 3 bước
 
-Web chạy **cục bộ**, gọi đúng `python -m pipeline.run`. Đây không phải phần chấm điểm, và web không ghi gì vào `submission/`, `configs/` hay `data/`.
+Web chạy **trên máy bạn**, dùng lại các bước của `pipeline/`. Đây không phải phần chấm điểm của lab; mọi thứ web sinh ra nằm trong `work/web/`, không đụng tới `submission/`, `configs/` hay `data/`.
 
 ```bash
 pip install -r webapp/requirements.txt
 python webapp/server.py        # mở http://127.0.0.1:8009
 ```
 
-## Làm gì trên web
-1. **Chỉnh 2 ngưỡng** (`phash_dist`, `conf`) và thư mục lô (mặc định `data/raw`; lô khác cần có `images/`, `labels/`, `data.yaml`).
-2. **▶ Chạy tự động**: người duyệt được mô phỏng (80 ảnh), ra kết luận Release / Hold / Rework ngay.
-3. **⏸ Chạy & dừng ở hàng đợi**: pipeline dừng (mã 30) để **bạn** duyệt. Ở tab *Duyệt ảnh*:
-   - danh sách xếp theo `05_review_queue.csv`;
-   - ảnh hiện nhãn (nét liền), dự đoán yolo26l (nét đứt), nhãn gốc (chấm xám), ô "thiếu?" màu đỏ (POSSIBLE_MISSING), dòng bị cờ có viền đỏ;
-   - xem: **lăn chuột** để zoom quanh con trỏ, **kéo** (hoặc chuột giữa / Space+kéo) để di chuyển, nút **− + 100% ⤢ Vừa khung**, phím `0` vừa khung, `1` 100%, double-click về vừa khung;
-   - sửa ngay trên ảnh: bấm chọn box rồi đổi lớp, kéo để di chuyển, kéo góc để đổi cỡ, **Del** để xoá, **＋ Vẽ box** để thêm, **Ctrl+S** để lưu; **J/K** chuyển ảnh.
-4. **⏵ Chạy tiếp sau khi duyệt**: ảnh có nhãn đổi nội dung được tính là đã duyệt (tối đa 80), rồi QC vòng 3 và cửa chặn.
+## Bước 1 · Kiểm tra
+Nhập thư mục lô ảnh (mặc định `data/raw`; lô khác cần có `images/`, `labels/`, `data.yaml`) rồi bấm **Bắt đầu kiểm tra**. Máy sẽ loại ảnh hỏng, trùng hoặc lộ tập test, tự sửa lỗi định dạng nhãn, rồi lập danh sách các ảnh nó nghi gán sai.
+*Cài đặt nâng cao*: 2 ngưỡng calibration, và **Chạy demo** (người duyệt mô phỏng của lab, ra kết quả ngay).
 
-Tab *Tổng quan* hiện kết luận, tỉ lệ ảnh còn cảnh báo so với ngưỡng Hold, và bảng số lỗi theo mã qua 3 vòng (trước sửa, sau máy sửa, cuối). Bấm một mã để lọc ảnh có mã đó.
+## Bước 2 · Duyệt ảnh
+Đi lần lượt từ trên xuống danh sách (ảnh nghi sai nặng nhất đứng đầu; ngân sách 80 ảnh). Với mỗi ảnh:
+- khung bên phải ghi **máy nghi gì** bằng lời thường, có nút **🔎 Xem chỗ này** và **nút sửa nhanh**: *Thêm box theo gợi ý*, *Đổi thành bus*, *Dùng box của model*, *Xoá box này*, *Lấy gợi ý model làm nháp*;
+- nhãn đúng thì bấm **✓ Nhãn đúng → ảnh tiếp** (Enter);
+- sửa xong thì bấm **💾 Lưu & sang ảnh tiếp** (Enter);
+- sửa tay trên ảnh: bấm box để chọn, kéo để di chuyển, kéo góc để đổi cỡ, **✏️ Vẽ box** (phím D), **Del** để xoá;
+- xem ảnh: lăn chuột để zoom, kéo để di chuyển, `0` để về vừa khung, **J/K** để sang ảnh sau/trước.
 
-Kết quả nằm trong `work/web/` (`reports/`, `run/ds/`, `export/`).
+Ảnh **chưa có nhãn** (chữ đỏ) bắt buộc phải gán, hoặc bấm *Ảnh không có vật nào*.
+
+## Bước 3 · Kết quả & xuất
+Bấm **Xong, xem kết quả**. Máy kiểm lại lần cuối rồi kết luận:
+- **ĐẠT**: không còn lỗi, và dưới 10% ảnh còn nghi ngờ chưa xem;
+- **TẠM GIỮ**: không còn lỗi, nhưng từ 10% ảnh trở lên còn nghi ngờ chưa xem (trang ghi rõ cần duyệt thêm bao nhiêu ảnh);
+- **CHƯA ĐẠT**: còn lỗi bắt buộc, ví dụ ảnh chưa có nhãn (bấm vào tên ảnh để đi sửa).
+
+Khi ĐẠT hoặc TẠM GIỮ: bấm **⬇ Tải dataset (.zip)** để lấy `images/`, `labels/` (YOLO), `data.yaml` và `manifest.json`.
+
+> Khác với `python -m pipeline.run --resume-after-review`: trên web, ảnh được **xác nhận "nhãn đúng"** cũng tính là đã duyệt (người duyệt thật có xem ảnh), chứ không chỉ ảnh bị sửa nhãn. Ngân sách vẫn là 80 ảnh.
