@@ -303,7 +303,7 @@ function go(n){
   if (!canStep(n)) return; STEP = n;
   ["#s1","#s2","#s3"].forEach((s, i) => $(s).classList.toggle("hidden", i + 1 !== n));
   renderStepper(); window.scrollTo({top:0});
-  if (n === 2 && !CUR){ const first = visibleItems().find(i => !i.status) || visibleItems()[0]; if (first) openImage(first.image); }
+  if (n === 2 && !CUR && !go.skipAuto){ const first = visibleItems().find(i => !i.status) || visibleItems()[0]; if (first) openImage(first.image); }
   if (n === 2 && V.wrap) requestAnimationFrame(() => { sizeWrap(); fitView(); });
 }
 function renderStepper(){
@@ -719,7 +719,13 @@ document.addEventListener("keydown", e => {
 document.addEventListener("keyup", e => { if (e.code === "Space") V.space = false; });
 window.addEventListener("beforeunload", e => { if (V.dirty){ e.preventDefault(); e.returnValue = ""; } });
 
-load().then(() => { if (S.finished) go(3); else if (S.can_review) go(2); else go(1); }).catch(e => toast("Không tải được: " + e.message));
+// mở thẳng một bước / một ảnh qua địa chỉ: #step=2&img=img_0020 (tiện khi demo)
+load().then(() => {
+  const h = new URLSearchParams(location.hash.slice(1)), want = +h.get("step");
+  go.skipAuto = !!h.get("img");
+  if (want && canStep(want)) go(want); else if (S.finished) go(3); else if (S.can_review) go(2); else go(1);
+  if (h.get("img") && STEP === 2) openImage(h.get("img"));
+}).catch(e => toast("Không tải được: " + e.message));
 </script>
 </body>
 </html>
