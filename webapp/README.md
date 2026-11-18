@@ -1,32 +1,51 @@
-# AutoQC web: kiểm nhãn ảnh theo 3 bước
+# AutoQC web: kiểm nhãn cho dataset YOLO bất kỳ
 
-Web chạy **trên máy bạn**, dùng lại các bước của `pipeline/`. Đây không phải phần chấm điểm của lab; mọi thứ web sinh ra nằm trong `work/web/`, không đụng tới `submission/`, `configs/` hay `data/`.
+Công cụ chạy **trên máy bạn**: chọn một dataset YOLO, máy tự kiểm và tự sửa lỗi quy tắc, (tuỳ chọn) nhờ một model "nhìn lại" để tìm chỗ nghi gán sai, rồi cho người duyệt trên ảnh và xuất dataset sạch.
+
+Công cụ dùng lại các check trong `pipeline/` của bài lab với một cấu hình sinh riêng cho từng dataset. Đây không phải phần chấm điểm; mọi thứ nằm trong `work/web/`, và **thư mục dataset gốc không bao giờ bị sửa**.
 
 ```bash
 pip install -r webapp/requirements.txt
 python webapp/server.py        # mở http://127.0.0.1:8009
 ```
 
-## Bước 1 · Kiểm tra
-Nhập thư mục lô ảnh (mặc định `data/raw`; lô khác cần có `images/`, `labels/`, `data.yaml`) rồi bấm **Bắt đầu kiểm tra**. Máy sẽ loại ảnh hỏng, trùng hoặc lộ tập test, tự sửa lỗi định dạng nhãn, rồi lập danh sách các ảnh nó nghi gán sai.
-*Cài đặt nâng cao*: 2 ngưỡng calibration, và **Chạy demo** (người duyệt mô phỏng của lab, ra kết quả ngay).
+## Dataset được hỗ trợ
+- `images/` + `labels/` (YOLO: `id cx cy w h`, toạ độ 0–1), **hoặc** `images/<phần>/` + `labels/<phần>/` (ví dụ `train`, `val`): chọn phần cần kiểm trên web.
+- `data.yaml` có `names` (list hoặc dict). Thiếu thì nhập tên lớp trên web. **Thứ tự lớp = id**, sửa được.
+- Ảnh `.jpg .jpeg .png` (không phân biệt hoa thường).
 
-## Bước 2 · Duyệt ảnh
-Đi lần lượt từ trên xuống danh sách (ảnh nghi sai nặng nhất đứng đầu; ngân sách 80 ảnh). Với mỗi ảnh:
-- khung bên phải ghi **máy nghi gì** bằng lời thường, có nút **🔎 Xem chỗ này** và **nút sửa nhanh**: *Thêm box theo gợi ý*, *Đổi thành bus*, *Dùng box của model*, *Xoá box này*, *Lấy gợi ý model làm nháp*;
-- nhãn đúng thì bấm **✓ Nhãn đúng → ảnh tiếp** (Enter);
-- sửa xong thì bấm **💾 Lưu & sang ảnh tiếp** (Enter);
-- sửa tay trên ảnh: bấm box để chọn, kéo để di chuyển, kéo góc để đổi cỡ, **✏️ Vẽ box** (phím D), **Del** để xoá;
-- xem ảnh: lăn chuột để zoom, kéo để di chuyển, `0` để về vừa khung, **J/K** để sang ảnh sau/trước.
+## Ý kiến thứ hai (model), tuỳ chọn
+| Lựa chọn | Khi nào dùng |
+|---|---|
+| **Tắt** | Chỉ kiểm quy tắc (định dạng, mã lớp, box tràn/rỗng/lặp, ảnh hỏng/trùng/lộ test). Nhanh, không cần model. |
+| **Model YOLO** | Model của bạn (train cho đúng các lớp này), hoặc model COCO (`yolo26l.pt`…) nếu lớp của bạn có trong COCO. Lớp được ghép **theo tên** (có vài tên đồng nghĩa: motorbike ↔ motorcycle…). Bấm **Kiểm tra model** để xem lớp nào khớp. |
+| **Dự đoán có sẵn** | Chỉ với dữ liệu bài lab (`data/raw`). |
 
-Ảnh **chưa có nhãn** (chữ đỏ) bắt buộc phải gán, hoặc bấm *Ảnh không có vật nào*.
+Model chạy bằng một Python **có cài `ultralytics`** (có thể khác Python chạy server). Điền đường dẫn trên web, hoặc đặt sẵn biến môi trường:
+```bash
+set AUTOQC_PREDICT_PYTHON=C:\path\to\venv\Scripts\python.exe
+```
+Dự đoán được lưu riêng theo từng dataset và model (`work/web/preds.json`), và dùng lại nếu chạy lại cùng dataset và model.
 
-## Bước 3 · Kết quả & xuất
-Bấm **Xong, xem kết quả**. Máy kiểm lại lần cuối rồi kết luận:
-- **ĐẠT**: không còn lỗi, và dưới 10% ảnh còn nghi ngờ chưa xem;
-- **TẠM GIỮ**: không còn lỗi, nhưng từ 10% ảnh trở lên còn nghi ngờ chưa xem (trang ghi rõ cần duyệt thêm bao nhiêu ảnh);
-- **CHƯA ĐẠT**: còn lỗi bắt buộc, ví dụ ảnh chưa có nhãn (bấm vào tên ảnh để đi sửa).
+> ⚠ Lớp **không có** trong model thì mọi box của lớp đó sẽ bị cờ "box thừa". Khi đó hãy dùng model của bạn, hoặc tắt.
 
-Khi ĐẠT hoặc TẠM GIỮ: bấm **⬇ Tải dataset (.zip)** để lấy `images/`, `labels/` (YOLO), `data.yaml` và `manifest.json`.
+## Quy tắc dự án (mục nâng cao)
+Ngân sách duyệt (mặc định 80 ảnh), ngưỡng Tạm giữ (10%), cạnh ảnh tối thiểu (250 px), thư mục ảnh tập test để phát hiện ảnh lộ, độ nhạy phát hiện ảnh trùng (`phash_dist` 12), độ tin tối thiểu của model (`conf` 0.6). Các giá trị mặc định là của bài lab: **hãy calibrate lại cho dataset của bạn** (`python -m pipeline.calibrate`, xem `docs/CALIBRATION.md`).
 
-> Khác với `python -m pipeline.run --resume-after-review`: trên web, ảnh được **xác nhận "nhãn đúng"** cũng tính là đã duyệt (người duyệt thật có xem ảnh), chứ không chỉ ảnh bị sửa nhãn. Ngân sách vẫn là 80 ảnh.
+## 3 bước
+1. **Kiểm tra**: đọc thư mục → chọn model → *Bắt đầu kiểm tra* (chạy nền, có tiến độ).
+2. **Duyệt ảnh**:
+   - danh sách xếp ảnh nghi sai nặng nhất lên đầu;
+   - mỗi ảnh có lời giải thích và **nút sửa nhanh** (Thêm box theo gợi ý, Đổi lớp, Dùng box của model, Xoá box);
+   - nhãn đúng thì **✓ Nhãn đúng**, sửa xong thì **💾 Lưu** (Enter);
+   - xem ảnh: lăn chuột để zoom, kéo để di chuyển; **J/K** để sang ảnh sau/trước.
+3. **Kết quả và xuất**:
+   - **ĐẠT** / **TẠM GIỮ** / **CHƯA ĐẠT**, kèm việc cần làm tiếp;
+   - **⬇ Tải dataset (.zip)**: `images/`, `labels/`, `data.yaml`, `manifest.json`.
+
+Trên web, ảnh được **xác nhận "nhãn đúng"** cũng tính là đã duyệt (khác `pipeline.run --resume-after-review`, vốn chỉ tính ảnh bị sửa nhãn).
+
+## Giới hạn hiện tại
+- Một dataset tại một thời điểm (kiểm dataset mới sẽ thay kết quả cũ trong `work/web/`).
+- Chỉ bounding box (không segment/pose). Dataset rất lớn (hàng chục nghìn ảnh) sẽ chậm, vì các check của lab duyệt ảnh tuần tự.
+- Model "ý kiến thứ hai" có điểm mù riêng: vật nhỏ và dày đặc, các lớp dễ nhầm với nhau. Model nhỏ (yolo26n) bỏ sót nhiều hơn, nên sẽ cờ "box thừa" nhiều hơn.

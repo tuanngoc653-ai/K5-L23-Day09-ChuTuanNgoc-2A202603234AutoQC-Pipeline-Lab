@@ -1,20 +1,22 @@
-"""Web tương tác cho pipeline kiểm nhãn (chạy CỤC BỘ, không phải phần chấm điểm).
+"""AutoQC web: kiểm nhãn cho dataset YOLO bất kỳ (chạy CỤC BỘ, không phải phần chấm điểm của lab).
 
     pip install -r webapp/requirements.txt
     python webapp/server.py            # mở http://127.0.0.1:8009
+    # (tuỳ chọn) Python có ultralytics để chạy model "ý kiến thứ hai":
+    #   set AUTOQC_PREDICT_PYTHON=C:\\path\\to\\venv\\Scripts\\python.exe
 
 Luồng 3 bước:
-  1. Kiểm tra   : chạy pipeline tới hàng đợi rồi dừng (= python -m pipeline.run --no-review)
+  1. Kiểm tra   : chọn dataset (lớp lấy từ data.yaml), tuỳ chọn chạy model, rồi pipeline tới hàng đợi và dừng
   2. Duyệt ảnh  : người xem từng ảnh trong hàng đợi; sửa nhãn hoặc xác nhận "nhãn đúng"
-  3. Kết quả    : QC vòng cuối + cửa chặn + xuất (giống phần sau người duyệt của pipeline.run),
-                  với "đã duyệt" = ảnh đã sửa  ∪  ảnh được xác nhận đúng (ngân sách vẫn 80 ảnh)
-Chế độ demo (= python -m pipeline.run) dùng người duyệt mô phỏng của lab.
+  3. Kết quả    : QC vòng cuối + cửa chặn + xuất (đã duyệt = ảnh đã sửa ∪ ảnh xác nhận đúng)
 
-Mọi thứ web sinh ra nằm trong work/web/ (không đụng submission/, configs/, data/).
+Web dùng lại các check trong pipeline/ với một cấu hình sinh riêng cho từng dataset (work/web/pipeline.yaml).
+Không bao giờ ghi vào thư mục dataset gốc: mọi thứ nằm trong work/web/.
 """
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
 import math
@@ -22,6 +24,7 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import zipfile
 from pathlib import Path
@@ -42,26 +45,44 @@ from pipeline.steps.report import write_report  # noqa: E402
 
 WEB = ROOT / "work" / "web"
 WORK, REP, EXP, CFG = WEB / "run", WEB / "reports", WEB / "export", WEB / "pipeline.yaml"
-LAST, CONFIRMED = WEB / "last_run.json", WEB / "confirmed.json"
+LAST, CONFIRMED, PROJECT = WEB / "last_run.json", WEB / "confirmed.json", WEB / "project.json"
+STAGE, PREDS, PREDS_META, PROGRESS = WEB / "raw", WEB / "preds.json", WEB / "preds.meta.json", WEB / "progress.json"
 DS = WORK / "ds"
 EXPORT_NAME = "clean_v1"
+LAB_RAW = (ROOT / "data" / "raw").resolve()
+PREDICT_PY = Path(__file__).parent / "predict.py"
 
 app = Flask(__name__, static_folder=str(Path(__file__).parent / "static"), static_url_path="/static")
 _preds_cache: dict = {}
+JOB: dict = {"running": False}
+JOB_LOCK = threading.Lock()
 
 
-# ---------------------------------------------------------------- tiện ích
+# ================================================================ tiện ích chung
+def rjson(p: Path, default=None):
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else default
+
+
+def wjson(p: Path, obj):
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(obj, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def resolve(path: str) -> Path:
+    p = Path(path.strip().strip('"'))
+    return (p if p.is_absolute() else ROOT / p).resolve()
+
+
 def cfg_now() -> dict:
     return yaml.safe_load(CFG.read_text(encoding="utf-8")) if CFG.exists() else load_config()
 
 
+def project() -> dict:
+    return rjson(PROJECT, {}) or {}
+
+
 def last_run() -> dict:
-    return json.loads(LAST.read_text(encoding="utf-8")) if LAST.exists() else {}
-
-
-def save_last(rec: dict):
-    WEB.mkdir(parents=True, exist_ok=True)
-    LAST.write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+    return rjson(LAST, {}) or {}
 
 
 def read_csv(p: Path) -> list[dict]:
@@ -69,7 +90,7 @@ def read_csv(p: Path) -> list[dict]:
 
 
 def confirmed() -> set[str]:
-    return set(json.loads(CONFIRMED.read_text(encoding="utf-8"))) if CONFIRMED.exists() else set()
+    return set(rjson(CONFIRMED, []))
 
 
 def latest_issue_file() -> Path:
@@ -78,26 +99,28 @@ def latest_issue_file() -> Path:
 
 def preds() -> dict:
     path = cfg_now()["models"]["checker"]["cache"]
-    if path not in _preds_cache:
-        _preds_cache[path] = load_cache(path)
-    return _preds_cache[path]
+    p = resolve(path)
+    key = (str(p), p.stat().st_mtime if p.exists() else 0)
+    if key not in _preds_cache:
+        _preds_cache.clear()
+        _preds_cache[key] = load_cache(str(p))
+    return _preds_cache[key]
+
+
+def images_in(d: Path) -> list[Path]:
+    return sorted(p for p in d.iterdir() if p.is_file() and p.suffix.lower() in IMG_EXTS) if d.is_dir() else []
 
 
 def find_image(folder: Path, stem: str) -> Path | None:
-    d = folder / "images"
-    if not d.exists():
-        return None
-    return next((p for p in d.iterdir() if p.stem == stem and p.suffix.lower() in IMG_EXTS), None)
+    return next((p for p in images_in(folder / "images") if p.stem == stem), None)
 
 
 def raw_dir() -> Path:
-    r = last_run().get("raw", "data/raw")
-    return Path(r) if Path(r).is_absolute() else ROOT / r
+    return Path(project().get("raw") or LAB_RAW)
 
 
 def ds_stems() -> list[str]:
-    d = DS / "images"
-    return sorted(p.stem for p in d.iterdir() if p.suffix.lower() in IMG_EXTS) if d.exists() else []
+    return [p.stem for p in images_in(DS / "images")]
 
 
 def label_lines(path: Path) -> list[dict] | None:
@@ -116,7 +139,6 @@ def label_lines(path: Path) -> list[dict] | None:
 
 
 def review_session() -> bool:
-    """Đang có phiên duyệt của người (bắt đầu bằng bước Kiểm tra, không phải demo)."""
     return last_run().get("mode") in ("check", "finish") and (WORK / "snapshot.json").exists()
 
 
@@ -131,8 +153,7 @@ def edited_stems() -> list[str]:
 def reviewed_now() -> tuple[list[str], list[str]]:
     ed = edited_stems()
     stems = set(ds_stems())
-    conf = sorted(s for s in confirmed() if s in stems and s not in ed)
-    return ed, conf
+    return ed, sorted(s for s in confirmed() if s in stems and s not in ed)
 
 
 def agg(rows: list[dict]) -> dict:
@@ -144,83 +165,296 @@ def agg(rows: list[dict]) -> dict:
     return {c: {"severity": v["severity"], "n": v["n"], "images": len(v["images"])} for c, v in out.items()}
 
 
-# ---------------------------------------------------------------- trang
+def yaml_classes(y: Path) -> list[str]:
+    try:
+        d = yaml.safe_load(y.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return []
+    n = d.get("names")
+    if isinstance(n, list):
+        return [str(x) for x in n]
+    if isinstance(n, dict):
+        return [str(n[k]) for k in sorted(n, key=lambda k: int(k))]
+    return []
+
+
+def default_python() -> str:
+    return os.environ.get("AUTOQC_PREDICT_PYTHON") or sys.executable
+
+
+# ================================================================ đọc thư mục dataset
+def inspect_folder(src: Path) -> dict:
+    """Nhận dạng cấu trúc: 'flat' (images/ + labels/) hoặc 'split' (images/<split>/ + labels/<split>/)."""
+    if not src.is_dir():
+        raise ValueError(f"Không thấy thư mục: {src}")
+    ymls = [src / "data.yaml"] + sorted(src.glob("*.yaml")) + sorted(src.glob("*.yml"))
+    yml = next((y for y in ymls if y.exists() and yaml_classes(y)), None)
+    info = dict(path=str(src), yaml=str(yml) if yml else None, classes=yaml_classes(yml) if yml else [],
+                lab=src.resolve() == LAB_RAW, layout=None, splits=[])
+    flat = images_in(src / "images")
+    if flat:
+        info.update(layout="flat", n_images=len(flat), n_labels=len(list((src / "labels").glob("*.txt"))) if (src / "labels").is_dir() else 0)
+    elif (src / "images").is_dir():
+        for d in sorted(p for p in (src / "images").iterdir() if p.is_dir()):
+            imgs = images_in(d)
+            if imgs:
+                ld = src / "labels" / d.name
+                info["splits"].append(dict(name=d.name, n_images=len(imgs), n_labels=len(list(ld.glob("*.txt"))) if ld.is_dir() else 0))
+        if info["splits"]:
+            info["layout"] = "split"
+    if not info["layout"]:
+        raise ValueError("Không thấy ảnh. Cần images/ (và labels/) ngay trong thư mục, hoặc images/<split>/ + labels/<split>/.")
+    if info["lab"]:
+        info["classes"] = load_config()["classes"]          # data.yaml của lô lab cố ý sai tên lớp
+    return info
+
+
+def stage_raw(p: dict) -> Path:
+    """Thư mục 'raw' mà pipeline đọc: chính thư mục gốc (kiểu flat), hoặc một bản liên kết cứng (kiểu split)."""
+    src = Path(p["source"])
+    if p["layout"] == "flat":
+        return src
+    shutil.rmtree(STAGE, ignore_errors=True)
+    (STAGE / "images").mkdir(parents=True)
+    (STAGE / "labels").mkdir()
+
+    def link(a: Path, b: Path):
+        try:
+            os.link(a, b)
+        except OSError:
+            shutil.copy2(a, b)
+    for img in images_in(src / "images" / p["split"]):
+        link(img, STAGE / "images" / img.name)
+    for lb in (src / "labels" / p["split"]).glob("*.txt") if (src / "labels" / p["split"]).is_dir() else []:
+        link(lb, STAGE / "labels" / lb.name)
+    if p.get("yaml"):
+        shutil.copy2(p["yaml"], STAGE / "data.yaml")
+    return STAGE
+
+
+def build_cfg(p: dict) -> dict:
+    cfg = load_config()                                       # quy tắc mặc định của lab làm khung
+    cfg["classes"] = p["classes"]
+    cfg["class_aliases"] = {}
+    cfg["intake"]["min_side_px"] = int(p.get("min_side", 250))
+    cfg["intake"]["reference_dirs"] = [str(resolve(d)) for d in p.get("leak_dirs", []) if d.strip()]
+    cfg["duplicates"]["phash_dist"] = int(p.get("phash_dist", 12))
+    cfg["second_opinion"]["conf"] = float(p.get("conf", 0.6))
+    cfg["review"]["budget_images"] = int(p.get("budget", 80))
+    cfg["gate"]["warn_ratio_hold"] = float(p.get("hold_ratio", 0.10))
+    mode = p.get("model_mode", "off")
+    if mode == "cache":
+        cfg["models"]["checker"]["cache"] = str(resolve(load_config()["models"]["checker"]["cache"]))
+    else:
+        cfg["models"]["checker"]["cache"] = str(PREDS)
+    if mode == "off":
+        cfg["second_opinion"]["iou_missing"] = 0.0            # không có dự đoán: tắt cờ "box thừa" (mọi box sẽ bị cờ)
+    return cfg
+
+
+# ================================================================ chạy nền
+def job_log(msg: str):
+    with JOB_LOCK:
+        JOB.setdefault("log", []).append(f"[{time.strftime('%H:%M:%S')}] {msg}")
+
+
+def run_job(mode: str, p: dict):
+    try:
+        JOB.update(stage="prepare", progress=None)
+        raw = stage_raw(p)
+        p["raw"] = str(raw)
+        wjson(PROJECT, p)
+        n_img = len(images_in(raw / "images"))
+        job_log(f"Dataset: {n_img} ảnh · {len(p['classes'])} lớp: {', '.join(p['classes'])}")
+
+        mm = p.get("model_mode", "off")
+        if mm == "yolo":
+            sig = hashlib.sha1(json.dumps([p["source"], p.get("split"), p["classes"], p["weights"], p.get("pred_conf", 0.1),
+                                            sorted(x.name for x in images_in(raw / "images"))]).encode()).hexdigest()
+            meta = rjson(PREDS_META, {}) or {}
+            if PREDS.exists() and meta.get("sig") == sig:
+                job_log("Dùng lại dự đoán model đã chạy trước (cùng dataset, cùng model).")
+            else:
+                JOB.update(stage="predict", progress=dict(done=0, total=n_img))
+                job_log(f"Chạy model {p['weights']} lên {n_img} ảnh…")
+                PROGRESS.unlink(missing_ok=True)
+                cmd = [p.get("python") or default_python(), str(PREDICT_PY), "--weights", p["weights"], "--images", str(raw / "images"),
+                       "--classes", ",".join(p["classes"]), "--out", str(PREDS), "--conf", str(p.get("pred_conf", 0.1)), "--progress", str(PROGRESS)]
+                proc = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+                                        env={**os.environ, "PYTHONUTF8": "1"})
+                out = []
+                while proc.poll() is None:
+                    pr = rjson(PROGRESS)
+                    if pr:
+                        JOB["progress"] = pr
+                    time.sleep(0.5)
+                out = (proc.stdout.read() or "").strip()
+                if proc.returncode != 0:
+                    raise RuntimeError("Chạy model lỗi:\n" + out[-1500:])
+                last = out.splitlines()[-1] if out else "{}"
+                try:
+                    r = json.loads(last)
+                    job_log(f"Model xong trong {r.get('seconds')}s. Lớp khớp: {', '.join(r.get('matched', [])) or '—'}"
+                            + (f" · không khớp: {', '.join(r['unmatched'])}" if r.get("unmatched") else ""))
+                except Exception:
+                    job_log("Model xong.")
+                wjson(PREDS_META, dict(sig=sig, at=time.strftime("%Y-%m-%d %H:%M:%S")))
+        elif mm == "off":
+            wjson(PREDS, {x.stem: [] for x in images_in(raw / "images")})
+            PREDS_META.unlink(missing_ok=True)
+            job_log("Ý kiến thứ hai: TẮT (chỉ kiểm quy tắc).")
+        else:
+            job_log("Ý kiến thứ hai: dùng dự đoán có sẵn của bài lab.")
+
+        cfg = build_cfg(p)
+        CFG.write_text(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False), encoding="utf-8")
+        CONFIRMED.unlink(missing_ok=True)
+        JOB.update(stage="pipeline", progress=None)
+        job_log("Chạy pipeline: cửa vào → QC → máy tự sửa → hàng đợi…")
+        args = [sys.executable, "-m", "pipeline.run", "--raw", str(raw), "--work", str(WORK), "--reports", str(REP),
+                "--export-dir", str(EXP), "--export-name", EXPORT_NAME, "--config", str(CFG)]
+        if mode == "check":
+            args.append("--no-review")
+        t0 = time.time()
+        pr = subprocess.run(args, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                            env={**os.environ, "PYTHONUTF8": "1"})
+        log = pr.stdout + ("\n" + pr.stderr if pr.stderr.strip() else "")
+        for line in pr.stdout.splitlines():
+            msg = line.split("] ", 1)[-1]
+            if msg.startswith("TẠM DỪNG"):                    # hướng dẫn dòng lệnh, không dành cho người dùng web
+                msg = "Tạm dừng: mời người duyệt ở Bước 2."
+            job_log("  " + msg)
+        wjson(LAST, dict(mode=mode, raw=str(raw), exit=pr.returncode, seconds=round(time.time() - t0, 1), at=time.strftime("%H:%M:%S"), log=log[-20000:]))
+        ok = (mode == "check" and pr.returncode == 30) or (mode == "demo" and pr.returncode in (0, 10, 20))
+        if not ok:
+            raise RuntimeError(f"Pipeline lỗi (mã {pr.returncode}):\n" + log[-1500:])
+        JOB.update(stage="done", error=None)
+        job_log("Xong.")
+    except Exception as e:                                    # báo lỗi lên giao diện, không làm chết server
+        JOB.update(stage="error", error=str(e))
+        job_log("LỖI: " + str(e)[:400])
+    finally:
+        JOB["running"] = False
+
+
+# ================================================================ API
 @app.get("/")
 def index():
     return app.send_static_file("index.html")
+
+
+@app.post("/api/inspect")
+def api_inspect():
+    path = (request.get_json(force=True) or {}).get("path", "")
+    try:
+        return jsonify(inspect_folder(resolve(path)))
+    except ValueError as e:
+        abort(400, str(e))
+
+
+@app.post("/api/model_check")
+def api_model_check():
+    b = request.get_json(force=True) or {}
+    py = b.get("python") or default_python()
+    classes = [c.strip() for c in b.get("classes", []) if c.strip()]
+    if not classes:
+        abort(400, "Chưa có danh sách lớp.")
+    try:
+        r = subprocess.run([py, str(PREDICT_PY), "--weights", b.get("weights", "yolo26l.pt"), "--classes", ",".join(classes), "--inspect"],
+                           cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600, env={**os.environ, "PYTHONUTF8": "1"})
+    except FileNotFoundError:
+        abort(400, f"Không chạy được Python: {py}")
+    if r.returncode != 0:
+        msg = (r.stderr or r.stdout).strip().splitlines()
+        tail = msg[-1] if msg else "lỗi không rõ"
+        if "No module named 'ultralytics'" in (r.stderr or ""):
+            tail = "Python này chưa cài ultralytics (pip install ultralytics), hoặc chọn Python khác."
+        abort(400, tail)
+    info = json.loads(r.stdout.strip().splitlines()[-1])
+    return jsonify(matched=info["matched"], unmatched=info["unmatched"], n_model_classes=len(info["names"]))
+
+
+@app.post("/api/start")
+def api_start():
+    b = request.get_json(force=True) or {}
+    mode = b.get("mode", "check")
+    if mode not in ("check", "demo"):
+        abort(400, "mode sai")
+    if JOB.get("running"):
+        abort(400, "Đang có một lần chạy khác.")
+    try:
+        info = inspect_folder(resolve(b.get("path", "")))
+    except ValueError as e:
+        abort(400, str(e))
+    classes = [c.strip() for c in b.get("classes", []) if c.strip()]
+    if not classes:
+        abort(400, "Cần ít nhất một lớp (thường lấy từ data.yaml).")
+    if len(set(classes)) != len(classes):
+        abort(400, "Tên lớp bị trùng.")
+    if info["layout"] == "split" and b.get("split") not in [s["name"] for s in info["splits"]]:
+        abort(400, "Hãy chọn phần dữ liệu (split) cần kiểm.")
+    mm = b.get("model_mode", "off")
+    if mm == "cache" and not info["lab"]:
+        abort(400, "Dự đoán có sẵn chỉ dành cho dữ liệu bài lab.")
+    if mode == "demo" and not info["lab"]:
+        abort(400, "Chế độ demo (người duyệt mô phỏng) chỉ có với dữ liệu bài lab.")
+    p = dict(source=info["path"], layout=info["layout"], split=b.get("split") if info["layout"] == "split" else None, yaml=info["yaml"],
+             classes=classes, lab=info["lab"], leak_dirs=[d for d in b.get("leak_dirs", []) if d.strip()],
+             model_mode=mm, weights=b.get("weights") or "yolo26l.pt", python=b.get("python") or default_python(), pred_conf=0.1,
+             phash_dist=int(b.get("phash_dist", 12)), conf=float(b.get("conf", 0.6)), budget=int(b.get("budget", 80)),
+             hold_ratio=float(b.get("hold_ratio", 0.10)), min_side=int(b.get("min_side", 250)))
+    with JOB_LOCK:
+        JOB.clear()
+        JOB.update(running=True, mode=mode, stage="prepare", log=[], error=None, started=time.time())
+    threading.Thread(target=run_job, args=(mode, p), daemon=True).start()
+    return jsonify(ok=True)
+
+
+@app.get("/api/job")
+def api_job():
+    with JOB_LOCK:
+        j = {k: v for k, v in JOB.items()}
+        j["log"] = list(JOB.get("log", []))[-60:]
+    return jsonify(j)
 
 
 @app.get("/api/state")
 def state():
     cfg = cfg_now()
     lr = last_run()
+    p = project()
     mode = lr.get("mode")
     stages = {k: (agg(read_csv(REP / f)) if (REP / f).exists() else None)
               for k, f in [("intake", "01_intake.csv"), ("v1", "02_error_list_v1.csv"), ("v2", "04_error_list_v2.csv"), ("v3", "07_error_list_v3.csv")]}
-    summary = json.loads((REP / "08_summary.json").read_text(encoding="utf-8")) if (REP / "08_summary.json").exists() else None
+    summary = rjson(REP / "08_summary.json")
     fixes: dict = {}
     for f in read_csv(REP / "03_fixes.csv"):
         fixes[f["action"]] = fixes.get(f["action"], 0) + 1
-    rd = raw_dir() / "images"
-    n_scanned = sum(p.suffix.lower() in IMG_EXTS for p in rd.iterdir()) if rd.exists() else None
     stems = ds_stems()
     ed, conf = reviewed_now()
-    unlabeled = [s for s in stems if not (DS / "labels" / f"{s}.txt").exists()]
     budget, hold = cfg["review"]["budget_images"], cfg["gate"]["warn_ratio_hold"]
     need_more = None
     if summary and summary["verdict"]["decision"] == "Hold":
         v = summary["verdict"]
         need_more = max(0, v["n_warn_images"] - (math.ceil(hold * v["n_images"]) - 1))
-    reviewed_n = (len(ed) + len(conf)) if review_session() else (summary or {}).get("reviewed", 0)
     exp_manifest = EXP / EXPORT_NAME / "manifest.json"
     return jsonify(
-        has_run=bool(lr), mode=mode, exit=lr.get("exit"), at=lr.get("at"), seconds=lr.get("seconds"), log=lr.get("log", ""),
-        raw=lr.get("raw", "data/raw"), can_review=review_session(), finished=mode in ("finish", "demo") and summary is not None,
+        has_run=bool(lr), mode=mode, exit=lr.get("exit"), at=lr.get("at"), log=lr.get("log", ""), project=p,
+        can_review=review_session(), finished=mode in ("finish", "demo") and summary is not None,
         summary=summary, stages=stages, fixes=fixes, queue_len=len(read_csv(REP / "05_review_queue.csv")),
-        n_scanned=n_scanned, n_intake_removed=len({r["image"] for r in read_csv(REP / "01_intake.csv")}), n_ds=len(stems),
-        edited=ed, confirmed=conf, reviewed=reviewed_n, unlabeled=unlabeled, need_more=need_more,
-        exported=exp_manifest.exists(), n_exported=json.loads(exp_manifest.read_text(encoding="utf-8"))["n_images"] if exp_manifest.exists() else 0,
+        n_scanned=len(images_in(raw_dir() / "images")) if p else None,
+        n_intake_removed=len({r["image"] for r in read_csv(REP / "01_intake.csv")}), n_ds=len(stems),
+        edited=ed, confirmed=conf, reviewed=(len(ed) + len(conf)) if review_session() else (summary or {}).get("reviewed", 0),
+        unlabeled=[s for s in stems if not (DS / "labels" / f"{s}.txt").exists()], need_more=need_more,
+        exported=exp_manifest.exists(), n_exported=(rjson(exp_manifest) or {}).get("n_images", 0),
+        budget=budget, hold_ratio=hold, classes=cfg["classes"], second_opinion=p.get("model_mode", "off") != "off",
         thresholds=dict(phash_dist=cfg["duplicates"]["phash_dist"], conf=cfg["second_opinion"]["conf"]),
-        budget=budget, hold_ratio=hold, classes=cfg["classes"],
+        default_python=default_python(), job_running=bool(JOB.get("running")),
     )
-
-
-@app.post("/api/run")
-def run_pipeline():
-    """mode = check (dừng ở hàng đợi cho người duyệt) | demo (người duyệt mô phỏng, chạy hết)."""
-    body = request.get_json(force=True) or {}
-    mode = body.get("mode", "check")
-    if mode not in ("check", "demo"):
-        abort(400, "mode sai")
-    raw = (body.get("raw") or last_run().get("raw") or "data/raw").strip()
-    rp = Path(raw) if Path(raw).is_absolute() else ROOT / raw
-    if not (rp / "images").is_dir():
-        abort(400, f"Không thấy thư mục ảnh: {rp / 'images'}")
-    cfg = load_config()
-    cfg["duplicates"]["phash_dist"] = int(body.get("phash_dist", cfg["duplicates"]["phash_dist"]))
-    cfg["second_opinion"]["conf"] = float(body.get("conf", cfg["second_opinion"]["conf"]))
-    WEB.mkdir(parents=True, exist_ok=True)
-    CFG.write_text(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False), encoding="utf-8")
-    CONFIRMED.unlink(missing_ok=True)
-    args = [sys.executable, "-m", "pipeline.run", "--raw", raw, "--work", str(WORK), "--reports", str(REP),
-            "--export-dir", str(EXP), "--export-name", EXPORT_NAME, "--config", str(CFG)]
-    if mode == "check":
-        args.append("--no-review")
-    t0 = time.time()
-    p = subprocess.run(args, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                       env={**os.environ, "PYTHONUTF8": "1"}, timeout=1800)
-    rec = dict(mode=mode, raw=raw, exit=p.returncode, seconds=round(time.time() - t0, 1), at=time.strftime("%H:%M:%S"),
-               log=(p.stdout + ("\n" + p.stderr if p.stderr.strip() else ""))[-20000:])
-    save_last(rec)
-    ok = (mode == "check" and p.returncode == 30) or (mode == "demo" and p.returncode in (0, 10, 20))
-    if not ok:
-        abort(500, "Pipeline lỗi (mã " + str(p.returncode) + "): " + rec["log"][-600:])
-    return jsonify(rec)
 
 
 @app.post("/api/finish")
 def finish():
-    """Kết thúc phiên duyệt: QC vòng cuối + cửa chặn + xuất (như phần sau người duyệt của pipeline.run)."""
     if not review_session():
         abort(400, "Chưa có phiên duyệt: bấm 'Bắt đầu kiểm tra' trước.")
     t0 = time.time()
@@ -253,12 +487,11 @@ def finish():
     exported = export.export(ds, EXP, EXPORT_NAME, verdict, cfg) if verdict["decision"] != "Rework" else None
     log.append(f"kết luận: {verdict['decision'].upper()} — {'; '.join(verdict['reasons'])}")
     log.append(f"xuất: {exported}" if exported else "KHÔNG xuất: còn lỗi bắt buộc (Rework)")
-    (REP / "08_summary.json").write_text(json.dumps(dict(
-        verdict=verdict, reviewed=len(reviewed), reviewed_edited=len(ed), reviewed_confirmed=len(conf), budget=budget,
-        seconds=round(time.time() - t0, 1), exported=str(exported) if exported else None), indent=2, ensure_ascii=False), encoding="utf-8")
+    wjson(REP / "08_summary.json", dict(verdict=verdict, reviewed=len(reviewed), reviewed_edited=len(ed), reviewed_confirmed=len(conf),
+                                        budget=budget, seconds=round(time.time() - t0, 1), exported=str(exported) if exported else None))
     lr = last_run()
-    save_last(dict(mode="finish", raw=lr.get("raw", "data/raw"), exit=EXIT[verdict["decision"]], seconds=round(time.time() - t0, 1),
-                   at=time.strftime("%H:%M:%S"), log=lr.get("log", "") + "\n--- hoàn tất duyệt (web) ---\n" + "\n".join(log)))
+    wjson(LAST, dict(mode="finish", raw=lr.get("raw"), exit=EXIT[verdict["decision"]], seconds=round(time.time() - t0, 1),
+                     at=time.strftime("%H:%M:%S"), log=lr.get("log", "") + "\n--- hoàn tất duyệt (web) ---\n" + "\n".join(log)))
     return jsonify(verdict=verdict)
 
 
@@ -275,7 +508,7 @@ def confirm(stem):
         s.add(stem)
     else:
         s.discard(stem)
-    CONFIRMED.write_text(json.dumps(sorted(s)), encoding="utf-8")
+    wjson(CONFIRMED, sorted(s))
     ed, conf = reviewed_now()
     return jsonify(ok=True, reviewed=len(ed) + len(conf))
 
@@ -289,13 +522,13 @@ def images():
         issues.setdefault(r["image"], set()).add(r["code"])
     ed, conf = (set(x) for x in reviewed_now())
     sim = {r["image"] for r in read_csv(REP / "06_review_log.csv")} if last_run().get("mode") == "demo" else set()
+    labels = {p.stem for p in (DS / "labels").glob("*.txt")} if (DS / "labels").is_dir() else set()
     rows = []
     for s in ds_stems():
         rk = rank.get(s)
         rows.append(dict(image=s, rank=rk[0] if rk else None, priority=rk[1] if rk else 0, queue_codes=rk[2] if rk else "",
                          codes=sorted(issues.get(s, [])),
-                         status="edited" if s in ed else "confirmed" if s in conf else "sim" if s in sim else None,
-                         has_label=(DS / "labels" / f"{s}.txt").exists()))
+                         status="edited" if s in ed else "confirmed" if s in conf else "sim" if s in sim else None, has_label=s in labels))
     removed = [dict(image=r["image"], code=r["code"], message=r["message"]) for r in read_csv(REP / "01_intake.csv")]
     return jsonify(images=rows, removed=removed)
 
@@ -355,8 +588,8 @@ def save_labels(stem):
     (DS / "labels").mkdir(parents=True, exist_ok=True)
     (DS / "labels" / f"{stem}.txt").write_text("".join(l + "\n" for l in lines), encoding="utf-8")
     s = confirmed()
-    s.discard(stem)                                   # đã sửa thì tính là "sửa", không còn là "xác nhận"
-    CONFIRMED.write_text(json.dumps(sorted(s)), encoding="utf-8")
+    s.discard(stem)
+    wjson(CONFIRMED, sorted(s))
     ed, conf = reviewed_now()
     return jsonify(ok=True, reviewed=len(ed) + len(conf), budget=cfg_now()["review"]["budget_images"])
 

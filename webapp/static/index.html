@@ -83,6 +83,19 @@ details.adv summary{cursor:pointer;color:var(--muted)}
 @media (max-width:1250px){.rv{grid-template-columns:200px minmax(0,1fr)} .rv .side{grid-column:1 / -1}}
 @media (max-width:800px){.rv{grid-template-columns:1fr}}
 .listcard{padding:10px}
+.sect{display:flex;align-items:center;gap:10px;margin:22px 0 8px;font-size:15px}
+.sect .sn{width:24px;height:24px;border-radius:6px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-size:12px}
+.opt{display:block;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-top:6px;cursor:pointer}
+.opt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.sub{margin-top:10px;padding:12px;border-radius:10px;background:var(--soft)}
+input[type=number]{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.dsbox{background:var(--soft);border-radius:10px;padding:12px 14px;display:grid;gap:10px}
+.dsbox label{font-size:12.5px;color:var(--muted);display:block;margin-bottom:3px}
+.cchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.cchip{font-size:12.5px;padding:1px 8px;border-radius:999px;color:#fff;font-weight:600}
+.jbar{height:8px;background:var(--soft);border-radius:6px;overflow:hidden;margin-top:6px}
+.jbar div{height:100%;background:var(--accent);width:0}
+.okc{color:var(--ok)} .errc{color:var(--err)} .warnc{color:var(--warn)}
 .ftabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
 .ftabs button{padding:4px 8px;font-size:12px}
 .list{max-height:calc(100vh - 230px);overflow:auto}
@@ -166,37 +179,60 @@ pre.log{max-height:300px;overflow:auto;background:var(--soft);padding:10px;borde
   <section id="s1" class="center stack">
     <div class="card">
       <h2>Bước 1 · Kiểm tra tự động</h2>
-      <p class="muted">Chọn thư mục lô ảnh đã gán nhãn (có <code>images/</code>, <code>labels/</code>, <code>data.yaml</code>). Máy sẽ:</p>
-      <ul class="todo">
-        <li><span class="ic">🗑️</span><div><b>Loại ảnh không dùng được</b><div class="muted small">ảnh hỏng, quá nhỏ, ảnh trùng nhau, ảnh trùng với tập test</div></div></li>
-        <li><span class="ic">🔧</span><div><b>Tự sửa lỗi định dạng nhãn</b><div class="muted small">dòng nhãn hỏng, mã lớp không tồn tại, box tràn ra ngoài ảnh, box lặp</div></div></li>
-        <li><span class="ic">🔍</span><div><b>Tìm chỗ nghi gán sai</b><div class="muted small">so với một model nhận diện lớn hơn: thiếu box, sai lớp, box lỏng, box thừa</div></div></li>
-        <li><span class="ic">📋</span><div><b>Lập danh sách ảnh cần bạn xem</b><div class="muted small">ảnh nghi sai nặng nhất xếp trước; bạn xem tối đa <span class="budgetN">80</span> ảnh ở bước 2</div></div></li>
-      </ul>
+      <p class="muted">Kiểm một dataset YOLO bất kỳ. Máy loại ảnh hỏng hoặc trùng, tự sửa lỗi định dạng nhãn, (tuỳ chọn) so với một model để tìm chỗ nghi gán sai, rồi lập danh sách ảnh cho bạn xem.</p>
+
+      <h3 class="sect"><span class="sn">A</span>Dữ liệu</h3>
       <div class="row">
-        <input type="text" id="raw" value="data/raw" aria-label="Thư mục lô ảnh">
-        <button class="primary big" id="btnCheck">Bắt đầu kiểm tra</button>
+        <input type="text" id="raw" placeholder="Đường dẫn thư mục dataset, ví dụ D:/datasets/helmet" aria-label="Thư mục dataset">
+        <button id="btnInspect">Đọc thư mục</button>
+        <button class="ghost" id="btnLab" title="Điền sẵn dữ liệu và cài đặt của bài lab Day 09">Dữ liệu bài lab</button>
       </div>
-      <div id="runMsg" class="loading hidden"><span class="spin"></span><span>Máy đang kiểm tra… (khoảng 10 giây)</span></div>
-      <details class="adv">
-        <summary>Cài đặt nâng cao</summary>
+      <div class="muted small" style="margin-top:6px">Cần <code>images/</code> + <code>labels/</code> (định dạng YOLO), hoặc <code>images/train</code> + <code>labels/train</code>…, kèm <code>data.yaml</code> có <code>names</code>. Thư mục gốc không bao giờ bị sửa.</div>
+      <div id="dsInfo" class="hidden" style="margin-top:12px"></div>
+
+      <h3 class="sect"><span class="sn">B</span>Ý kiến thứ hai (model)</h3>
+      <div class="muted small" style="margin-bottom:6px">Một model nhận diện “nhìn lại” để tìm thiếu box, sai lớp, box lỏng, box thừa. Chỉ cảnh báo, người quyết.</div>
+      <label class="opt"><input type="radio" name="mm" value="off"> <b>Tắt</b> <span class="muted">· chỉ kiểm quy tắc (nhanh, không cần model)</span></label>
+      <label class="opt"><input type="radio" name="mm" value="yolo"> <b>Model YOLO</b> <span class="muted">· model của bạn (cùng tên lớp) hoặc model COCO như yolo26l.pt</span></label>
+      <label class="opt hidden" id="optCache"><input type="radio" name="mm" value="cache"> <b>Dự đoán có sẵn của bài lab</b> <span class="muted">· không cần GPU</span></label>
+      <div id="yoloCfg" class="hidden sub">
         <div class="advgrid">
+          <div><label class="small"><b>File model</b> (.pt, hoặc tên model Ultralytics)</label><input type="text" id="weights" value="yolo26l.pt" style="width:100%"></div>
+          <div><label class="small"><b>Python có cài ultralytics</b></label><input type="text" id="pyPath" style="width:100%"></div>
+        </div>
+        <div class="row" style="margin-top:8px"><button id="btnModel">Kiểm tra model</button><span id="modelRes" class="small"></span></div>
+      </div>
+
+      <details class="adv">
+        <summary>Quy tắc dự án (nâng cao)</summary>
+        <div class="advgrid">
+          <div><label class="small"><b>Ngân sách duyệt</b> (số ảnh người xem tối đa)</label><input type="number" id="budget" min="1" value="80" style="width:120px"></div>
+          <div><label class="small"><b>Ngưỡng Tạm giữ</b>: tỉ lệ ảnh còn cảnh báo chưa xem (%)</label><input type="number" id="hold" min="1" max="100" value="10" style="width:120px"></div>
+          <div><label class="small"><b>Cạnh ảnh tối thiểu</b> (px); nhỏ hơn thì loại</label><input type="number" id="minSide" min="1" value="250" style="width:120px"></div>
+          <div><label class="small"><b>Thư mục ảnh tập test</b> để phát hiện ảnh lộ (cách nhau bằng ;), có thể bỏ trống</label><input type="text" id="leak" style="width:100%"></div>
           <div>
             <label class="small"><b>Độ nhạy phát hiện ảnh trùng</b> (phash_dist): <b id="phashV"></b></label>
-            <input type="range" id="phash" min="0" max="20" step="1">
-            <div class="muted small">Cao hơn = coi nhiều ảnh là "trùng" hơn, dễ loại nhầm ảnh khác nhau. Đã chọn 12 bằng calibration.</div>
+            <input type="range" id="phash" min="0" max="20" step="1" value="12">
+            <div class="muted small">Cao hơn = coi nhiều ảnh là “trùng” hơn, dễ loại nhầm. Lab chọn 12 bằng calibration.</div>
           </div>
           <div>
             <label class="small"><b>Độ tin tối thiểu của model</b> (conf): <b id="confV"></b></label>
-            <input type="range" id="conf" min="0.1" max="0.9" step="0.05">
-            <div class="muted small">Thấp hơn = máy nghi ngờ nhiều hơn (nhiều ảnh phải xem hơn). Đã chọn 0.6 bằng calibration.</div>
+            <input type="range" id="conf" min="0.1" max="0.9" step="0.05" value="0.6">
+            <div class="muted small">Thấp hơn = nghi ngờ nhiều hơn, nhiều ảnh phải xem hơn. Lab chọn 0.6.</div>
           </div>
         </div>
-        <div class="row" style="margin-top:14px">
-          <button id="btnDemo">Chạy demo: máy tự duyệt</button>
-          <span class="muted small">Bỏ qua bước 2: dùng người duyệt mô phỏng của bài lab (80 ảnh) rồi ra kết quả ngay.</span>
-        </div>
       </details>
+
+      <div class="row" style="margin-top:18px">
+        <button class="primary big" id="btnCheck" disabled>Bắt đầu kiểm tra</button>
+        <button id="btnDemo" class="hidden" title="Dùng người duyệt mô phỏng của bài lab (80 ảnh) rồi ra kết quả ngay">Chạy demo: máy tự duyệt</button>
+        <span id="checkHint" class="muted small">Đọc thư mục trước.</span>
+      </div>
+      <div id="jobBox" class="hidden" style="margin-top:14px">
+        <div class="loading"><span class="spin" id="jobSpin"></span><b id="jobStage"></b></div>
+        <div class="jbar hidden" id="jobBarWrap"><div id="jobBar"></div></div>
+        <pre class="log" id="jobLog" style="max-height:200px;margin-top:8px"></pre>
+      </div>
     </div>
 
     <div class="card hidden" id="s1res">
@@ -262,10 +298,14 @@ async function api(path, opts){
   if (!r.ok) throw new Error(data.error || ("HTTP " + r.status)); return data;
 }
 const post = (path, body) => api(path, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body || {})});
-const COLORS = () => { const cs = getComputedStyle(document.documentElement); return ["--car","--person","--truck","--bus"].map(v => cs.getPropertyValue(v).trim()); };
-const VI = {car:"ô tô", person:"người", truck:"xe tải", bus:"xe buýt"};
+// màu theo id lớp: 4 màu đầu giống bài lab, sau đó bảng màu dài (lặp lại nếu nhiều lớp hơn)
+const EXTRA = ["#059669","#0891b2","#ca8a04","#db2777","#4f46e5","#65a30d","#0d9488","#c026d3","#b45309","#475569","#e11d48","#7c3aed"];
+const COLORS = () => { const cs = getComputedStyle(document.documentElement); const base = ["--car","--person","--truck","--bus"].map(v => cs.getPropertyValue(v).trim());
+  const n = Math.max(4, (S && S.classes ? S.classes.length : 4)); return Array.from({length:n}, (_, i) => i < 4 ? base[i] : EXTRA[(i - 4) % EXTRA.length]); };
+const colorOf = i => { const c = COLORS(); return c[i % c.length]; };
+const VI = {car:"ô tô", person:"người", truck:"xe tải", bus:"xe buýt", motorcycle:"xe máy", bicycle:"xe đạp", dog:"chó", cat:"mèo", helmet:"mũ bảo hiểm"};
 const cname = i => S.classes[i] ?? ("lớp " + i);
-const cnameVi = i => `${cname(i)} (${VI[cname(i)] || ""})`;
+const cnameVi = i => VI[cname(i)] ? `${cname(i)} (${VI[cname(i)]})` : cname(i);
 const pct = x => (x * 100).toFixed(1).replace(".0", "") + "%";
 const iou = (a, b) => {
   const [ax1, ay1, ax2, ay2] = [a[0]-a[2]/2, a[1]-a[3]/2, a[0]+a[2]/2, a[1]+a[3]/2], [bx1, by1, bx2, by2] = [b[0]-b[2]/2, b[1]-b[3]/2, b[0]+b[2]/2, b[1]+b[3]/2];
@@ -290,7 +330,7 @@ const V = {img:null, boxes:[], sel:-1, dirty:false, tool:"select", addCls:0, sho
 async function load(){
   S = await api("/api/state");
   const d = await api("/api/images"); IMAGES = d.images; REMOVED = d.removed;
-  if (!load._init){ $("#phash").value = S.thresholds.phash_dist; $("#conf").value = S.thresholds.conf; $("#raw").value = S.raw || "data/raw"; load._init = true; }
+  if (!load._init){ load._init = true; prefill(); }
   syncRanges();
   document.querySelectorAll(".budgetN").forEach(e => e.textContent = S.budget);
   const dec = S.finished && S.summary ? S.summary.verdict.decision : null;
@@ -317,17 +357,113 @@ function renderStepper(){
 // ================= BƯỚC 1 =================
 function syncRanges(){ $("#phashV").textContent = $("#phash").value; $("#confV").textContent = Number($("#conf").value).toFixed(2); }
 $("#phash").oninput = syncRanges; $("#conf").oninput = syncRanges;
+
+// ---- A. dữ liệu
+let DSI = null;                                   // kết quả đọc thư mục
+const LAB_DEFAULTS = {leak:"data/test/images; data/gold_val/images", budget:80, hold:10, minSide:250, phash:12, conf:0.6, mm:"cache"};
+function classesNow(){ const i = $("#classes"); return i ? i.value.split(",").map(s => s.trim()).filter(Boolean) : []; }
+function mmNow(){ const r = document.querySelector('input[name="mm"]:checked'); return r ? r.value : "off"; }
+function setMM(v){ const r = document.querySelector(`input[name="mm"][value="${v}"]`); if (r) r.checked = true; updateModelUI(); }
+function updateModelUI(){
+  $("#yoloCfg").classList.toggle("hidden", mmNow() !== "yolo");
+  const lab = DSI && DSI.lab; $("#optCache").classList.toggle("hidden", !lab);
+  if (!lab && mmNow() === "cache") setMM("off");
+  $("#btnDemo").classList.toggle("hidden", !lab);
+}
+document.querySelectorAll('input[name="mm"]').forEach(r => r.onchange = () => { updateModelUI(); $("#modelRes").textContent = ""; });
+function renderClassChips(){
+  const box = $("#cchips"); if (!box) return; const cs = classesNow();
+  const pal = ["#2563eb","#dc2626","#ea580c","#9333ea", ...EXTRA];
+  box.replaceChildren(...cs.map((c, i) => el("span",{class:"cchip", style:`background:${pal[i % pal.length]}`, text:`${i}: ${c}`})));
+}
+async function inspect(quiet){
+  const path = $("#raw").value.trim(); if (!path){ toast("Nhập đường dẫn thư mục dataset"); return; }
+  try { DSI = await post("/api/inspect", {path}); }
+  catch (e) { DSI = null; $("#dsInfo").classList.remove("hidden"); $("#dsInfo").replaceChildren(el("div",{class:"banner err", text:e.message})); updateCheckBtn(); return; }
+  const p = (S && S.project && S.project.source === DSI.path) ? S.project : null;     // giữ cài đặt cũ nếu cùng dataset
+  const box = el("div",{class:"dsbox"});
+  const what = DSI.layout === "flat" ? `images/ + labels/ · ${DSI.n_images} ảnh · ${DSI.n_labels} file nhãn` : `chia theo phần (images/<phần>/) · ${DSI.splits.length} phần`;
+  box.append(el("div",{}, el("b",{class:"okc", text:"✓ Đọc được dataset"}), el("span",{class:"muted small", text:"  " + what + (DSI.lab ? " · dữ liệu bài lab" : "")})));
+  if (DSI.layout === "split"){
+    const sel = el("select",{id:"split"}, DSI.splits.map(s => el("option",{value:s.name, text:`${s.name} — ${s.n_images} ảnh, ${s.n_labels} file nhãn`, selected: p && p.split === s.name})));
+    box.append(el("div",{}, el("label",{text:"Phần cần kiểm"}), sel));
+  }
+  const cls = (p && p.classes) || DSI.classes;
+  box.append(el("div",{}, el("label",{text: DSI.yaml ? `Lớp (thứ tự = id), lấy từ ${DSI.yaml.split(/[\\/]/).pop()}; sửa được, cách nhau bằng dấu phẩy` : "Không thấy data.yaml: nhập tên lớp theo thứ tự id, cách nhau bằng dấu phẩy"}),
+    el("input",{type:"text", id:"classes", value:cls.join(", "), style:"width:100%", oninput:() => { renderClassChips(); updateCheckBtn(); $("#modelRes").textContent = ""; }}),
+    el("div",{class:"cchips", id:"cchips"})));
+  $("#dsInfo").replaceChildren(box); $("#dsInfo").classList.remove("hidden");
+  renderClassChips();
+  if (p){                                          // khôi phục cài đặt của lần chạy trước
+    $("#leak").value = (p.leak_dirs || []).join("; "); $("#budget").value = p.budget; $("#hold").value = Math.round(p.hold_ratio * 100);
+    $("#minSide").value = p.min_side; $("#phash").value = p.phash_dist; $("#conf").value = p.conf;
+    $("#weights").value = p.weights || "yolo26l.pt"; $("#pyPath").value = p.python || S.default_python; setMM(p.model_mode);
+  } else if (DSI.lab){
+    $("#leak").value = LAB_DEFAULTS.leak; $("#budget").value = 80; $("#hold").value = 10; $("#minSide").value = 250; $("#phash").value = 12; $("#conf").value = 0.6; setMM("cache");
+  } else if (!quiet){
+    $("#leak").value = ""; if (mmNow() === "cache") setMM("off");
+  }
+  syncRanges(); updateModelUI(); updateCheckBtn();
+}
+function updateCheckBtn(){
+  const ok = DSI && classesNow().length > 0 && !(S && S.job_running);
+  $("#btnCheck").disabled = !ok; $("#btnDemo").disabled = !ok;
+  $("#checkHint").textContent = !DSI ? "Đọc thư mục trước." : !classesNow().length ? "Cần ít nhất một lớp." : "";
+}
+$("#btnInspect").onclick = () => inspect(false);
+$("#raw").addEventListener("keydown", e => { if (e.key === "Enter") inspect(false); });
+$("#btnLab").onclick = () => { $("#raw").value = "data/raw"; inspect(false); };
+$("#btnModel").onclick = async () => {
+  const r = $("#modelRes"); r.className = "small muted"; r.textContent = "Đang nạp model… (lần đầu có thể phải tải về)";
+  $("#btnModel").disabled = true;
+  try {
+    const m = await post("/api/model_check", {python: $("#pyPath").value.trim(), weights: $("#weights").value.trim(), classes: classesNow()});
+    if (!m.matched.length){ r.className = "small errc"; r.textContent = `✗ Model (${m.n_model_classes} lớp) không có lớp nào trùng tên với dataset. Dùng model của bạn, hoặc tắt.`; }
+    else if (m.unmatched.length){ r.className = "small warnc"; r.textContent = `⚠ Khớp: ${m.matched.join(", ")}. KHÔNG có trong model: ${m.unmatched.join(", ")} → box của các lớp này sẽ bị cờ “box thừa” hàng loạt. Nên dùng model của bạn.`; }
+    else { r.className = "small okc"; r.textContent = `✓ Model nhận ra đủ ${m.matched.length} lớp: ${m.matched.join(", ")}.`; }
+  } catch (e) { r.className = "small errc"; r.textContent = "✗ " + e.message; }
+  $("#btnModel").disabled = false;
+};
+function prefill(){
+  const p = S.project || {};
+  $("#pyPath").value = p.python || S.default_python || "";
+  if (p.source){ $("#raw").value = p.source; inspect(true); }
+  updateModelUI(); updateCheckBtn();
+  if (S.job_running) pollJob();
+}
+
+// ---- chạy nền + tiến độ
 async function runCheck(mode){
   if (S && S.can_review && (S.edited.length + S.confirmed.length) > 0 &&
       !confirm(`Bạn đã duyệt ${S.edited.length + S.confirmed.length} ảnh. Kiểm tra lại từ đầu sẽ XOÁ các chỉnh sửa này. Tiếp tục?`)) return;
-  $("#btnCheck").disabled = $("#btnDemo").disabled = true; $("#runMsg").classList.remove("hidden");
-  try {
-    await post("/api/run", {mode, raw: $("#raw").value, phash_dist: +$("#phash").value, conf: +$("#conf").value});
-    CUR = null; V.dirty = false; await load();
-    if (mode === "check"){ toast("Kiểm tra xong — mời bạn duyệt các ảnh máy nghi sai"); }
-    else { toast("Demo xong — xem kết quả"); go(3); }
-  } catch (e) { toast("Lỗi: " + e.message); }
-  $("#btnCheck").disabled = $("#btnDemo").disabled = false; $("#runMsg").classList.add("hidden");
+  if (mmNow() === "yolo" && !$("#weights").value.trim()){ toast("Nhập file model"); return; }
+  const body = {mode, path: $("#raw").value.trim(), split: $("#split") ? $("#split").value : null, classes: classesNow(),
+    leak_dirs: $("#leak").value.split(";").map(s => s.trim()).filter(Boolean), model_mode: mmNow(), weights: $("#weights").value.trim(),
+    python: $("#pyPath").value.trim(), budget: +$("#budget").value, hold_ratio: +$("#hold").value / 100, min_side: +$("#minSide").value,
+    phash_dist: +$("#phash").value, conf: +$("#conf").value};
+  try { await post("/api/start", body); CUR = null; V.dirty = false; pollJob(mode); }
+  catch (e) { toast("Lỗi: " + e.message); }
+}
+const STAGE_TXT = {prepare:"Chuẩn bị dữ liệu…", predict:"Model đang xem từng ảnh…", pipeline:"Máy đang kiểm tra và tự sửa…", done:"Xong", error:"Có lỗi"};
+async function pollJob(mode){
+  $("#jobBox").classList.remove("hidden"); $("#btnCheck").disabled = $("#btnDemo").disabled = true;
+  let j;
+  while (true){
+    j = await api("/api/job");
+    $("#jobStage").textContent = STAGE_TXT[j.stage] || j.stage || "";
+    $("#jobSpin").classList.toggle("hidden", !j.running);
+    const pr = j.progress; $("#jobBarWrap").classList.toggle("hidden", !(pr && pr.total));
+    if (pr && pr.total){ $("#jobBar").style.width = (pr.done / pr.total * 100) + "%"; $("#jobStage").textContent += ` ${pr.done}/${pr.total} ảnh`; }
+    $("#jobLog").textContent = (j.log || []).join("\n"); $("#jobLog").scrollTop = 1e6;
+    if (!j.running) break;
+    await new Promise(r => setTimeout(r, 800));
+  }
+  await load();
+  if (j.stage === "error"){ toast("Lỗi khi chạy — xem nhật ký bên dưới"); $("#jobStage").className = "errc"; updateCheckBtn(); return; }
+  $("#jobStage").className = "";
+  updateCheckBtn();
+  if ((mode || j.mode) === "demo"){ toast("Demo xong — xem kết quả"); go(3); }
+  else toast("Kiểm tra xong — bấm “Sang bước 2” để duyệt");
 }
 $("#btnCheck").onclick = () => runCheck("check");
 $("#btnDemo").onclick = () => runCheck("demo");
@@ -377,8 +513,9 @@ function visibleItems(){
 }
 function whyText(it){
   if (it.removed) return it.why;
-  const codes = (it.queue_codes ? it.queue_codes.split(";") : it.codes).filter(c => !c.startsWith("FIXED_"));
-  return codes.map(c => (NAME[c] || c).replace(/^Có thể /, "")).join(" · ") || (it.codes.length ? "" : "không có cờ");
+  const all = it.queue_codes ? it.queue_codes.split(";") : it.codes, codes = all.filter(c => !c.startsWith("FIXED_"));
+  const txt = codes.map(c => (NAME[c] || c).replace(/^Có thể /, "")).join(" · ");
+  return txt || all.filter(c => c.startsWith("FIXED_")).map(c => NAME[c]).join(" · ") || "không có cờ";
 }
 function renderList(){
   const counts = {queue: IMAGES.filter(i => i.rank).length, todo: IMAGES.filter(i => i.rank && !i.status).length, all: IMAGES.length, removed: REMOVED.length};
@@ -422,7 +559,7 @@ function buildViewer(){
     ed ? el("button",{id:"tSel", title:"Chọn / di chuyển / đổi cỡ box (Esc)", onclick:() => setTool("select"), text:"✋ Chọn"}) : null,
     ed ? el("button",{id:"tDraw", title:"Vẽ box mới (D)", onclick:() => setTool("draw"), text:"✏️ Vẽ box"}) : null,
     ed ? clsSel : null, ed ? el("span",{class:"sep"}) : null,
-    el("button",{id:"tPred", title:"Hiện/ẩn gợi ý của model", onclick:() => { V.showPred = !V.showPred; updateTools(); draw(); }, text:"Gợi ý model"}),
+    S.second_opinion ? el("button",{id:"tPred", title:"Hiện/ẩn gợi ý của model", onclick:() => { V.showPred = !V.showPred; updateTools(); draw(); }, text:"Gợi ý model"}) : null,
     el("button",{id:"tRaw", title:"Hiện/ẩn nhãn gốc trước khi máy sửa", onclick:() => { V.showRaw = !V.showRaw; updateTools(); draw(); }, text:"Nhãn gốc"}),
     el("span",{style:"flex:1"}),
     el("button",{title:"Thu nhỏ (−)", onclick:() => zoomBy(1/1.25), text:"−"}), el("span",{class:"zl", id:"zl"}),
@@ -454,10 +591,10 @@ function describe(iss, k){
   const pr = ex.conf != null && ex.cls != null ? findPred(ex) : null;
   switch (iss.code){
     case "MISSING_LABEL_FILE":
-      d.dd = "Ảnh này chưa được gán nhãn. Vẽ box cho mọi ô tô, người, xe tải, xe buýt — hoặc lấy gợi ý của model làm nháp rồi chỉnh.";
-      d.fix = [["＋ Lấy gợi ý model làm nháp", () => addAllPreds()], ["Ảnh không có vật nào", () => { V.boxes = []; changed(); save(); }]]; break;
+      d.dd = `Ảnh này chưa được gán nhãn. Vẽ box cho mọi vật thuộc các lớp: ${S.classes.join(", ")}` + (CUR.preds.length ? " — hoặc lấy gợi ý của model làm nháp rồi chỉnh." : ".");
+      d.fix = [CUR.preds.length ? ["＋ Lấy gợi ý model làm nháp", () => addAllPreds()] : null, ["Ảnh không có vật nào", () => { V.boxes = []; changed(); save(); }]].filter(Boolean); break;
     case "EMPTY_LABEL":
-      d.dd = "Ảnh không có box nào. Nếu ảnh thật sự không có ô tô/người/xe tải/xe buýt thì nhãn đúng; nếu có thì phải vẽ.";
+      d.dd = `Ảnh không có box nào. Nếu ảnh thật sự không có vật nào thuộc ${S.classes.join(", ")} thì nhãn đúng; nếu có thì phải vẽ.`;
       d.fix = CUR.preds.length ? [["＋ Lấy gợi ý model làm nháp", () => addAllPreds()]] : null; break;
     case "POSSIBLE_MISSING":
       d.dd = `Model thấy một ${cnameVi(ex.cls)} (tin ${pct(ex.conf)}) ở khung đỏ nhưng nhãn không có box ở đó.`;
