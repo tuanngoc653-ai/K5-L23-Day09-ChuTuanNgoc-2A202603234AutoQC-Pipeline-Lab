@@ -13,6 +13,7 @@ python webapp/server.py        # mở http://127.0.0.1:8009
 3. **⏸ Chạy & dừng ở hàng đợi**: pipeline dừng (mã 30) để **bạn** duyệt. Ở tab *Duyệt ảnh*:
    - danh sách xếp theo `05_review_queue.csv`;
    - ảnh hiện nhãn (nét liền), dự đoán yolo26l (nét đứt), nhãn gốc (chấm xám), ô "thiếu?" màu đỏ (POSSIBLE_MISSING), dòng bị cờ có viền đỏ;
+   - xem: **lăn chuột** để zoom quanh con trỏ, **kéo** (hoặc chuột giữa / Space+kéo) để di chuyển, nút **− + 100% ⤢ Vừa khung**, phím `0` vừa khung, `1` 100%, double-click về vừa khung;
    - sửa ngay trên ảnh: bấm chọn box rồi đổi lớp, kéo để di chuyển, kéo góc để đổi cỡ, **Del** để xoá, **＋ Vẽ box** để thêm, **Ctrl+S** để lưu; **J/K** chuyển ảnh.
 4. **⏵ Chạy tiếp sau khi duyệt**: ảnh có nhãn đổi nội dung được tính là đã duyệt (tối đa 80), rồi QC vòng 3 và cửa chặn.
 
