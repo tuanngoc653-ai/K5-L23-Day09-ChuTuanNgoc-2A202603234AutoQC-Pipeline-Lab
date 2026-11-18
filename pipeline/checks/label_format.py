@@ -24,6 +24,48 @@ Gợi ý
 from ..common import ERROR, WARN, Issue, iou_xywh, parse_yolo_line  # noqa: F401
 
 
+def _overflow(cx, cy, w, h):
+    """Mức tràn lớn nhất của 4 mép box ra ngoài [0,1] (0 nếu nằm trọn trong ảnh)."""
+    return max(0.0, -(cx - w / 2), (cx + w / 2) - 1.0, -(cy - h / 2), (cy + h / 2) - 1.0)
+
+
 def run(ds, cfg):
-    # TODO: duyệt từng file nhãn, từng dòng
-    raise NotImplementedError("check label_format chưa làm")
+    p = cfg["label_format"]
+    tol, min_px, max_frac, dup_iou = p["overflow_tol"], p["min_box_px"], p["max_box_frac"], p["dup_box_iou"]
+    n_cls = len(ds.classes)
+    issues = []
+
+    def add(sev, code, stem, msg, line, extra=None):
+        issues.append(Issue("label_format", sev, code, stem, msg, line, extra or {}))
+
+    for lp in ds.label_files():
+        stem = lp.stem
+        size = ds.image_size(stem)                                    # None (nhãn mồ côi / ảnh hỏng): bỏ qua BOX_TINY
+        prev = []                                                     # (số dòng, box) các dòng hợp lệ đã thấy
+        for ln, text in ds.read_label_lines(stem) or []:              # số dòng GỐC, đã bỏ dòng trống
+            try:
+                c, cx, cy, w, h = parse_yolo_line(text)
+            except ValueError as e:
+                add(ERROR, "BAD_FORMAT", stem, f"dòng không đúng 5 cột số: {e}", ln)
+                continue
+            if not 0 <= c < n_cls:
+                add(ERROR, "BAD_CLASS_ID", stem, f"id lớp {c} ngoài 0..{n_cls - 1}", ln, {"class_id": c})
+                continue
+            if w <= 0 or h <= 0:
+                add(ERROR, "BOX_ZERO", stem, f"box rỗng: w={w}, h={h}", ln)
+                continue
+            box = (cx, cy, w, h)
+            over = _overflow(*box)
+            if over > tol:
+                add(ERROR, "BOX_OUT_OF_IMAGE", stem, f"box tràn ảnh {over:.4f} > {tol}", ln, {"overflow": round(over, 6)})
+            dup = next((pl for pl, (pc, pb) in prev if pc == c and iou_xywh(pb, box) > dup_iou), None)
+            if dup is not None:
+                add(ERROR, "DUP_BOX", stem, f"box lặp với dòng {dup} (cùng lớp {c})", ln, {"of_line": dup})
+            if size:
+                short = min(w * size[0], h * size[1])
+                if short < min_px:
+                    add(WARN, "BOX_TINY", stem, f"cạnh ngắn {short:.1f}px < {min_px}px", ln, {"short_px": round(short, 1)})
+            if w * h > max_frac:
+                add(WARN, "BOX_HUGE", stem, f"box chiếm {w * h:.2f} ảnh > {max_frac}", ln, {"frac": round(w * h, 4)})
+            prev.append((ln, (c, box)))
+    return issues
