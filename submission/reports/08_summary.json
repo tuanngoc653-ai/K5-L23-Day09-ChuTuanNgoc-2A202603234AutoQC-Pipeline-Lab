@@ -1,0 +1,18 @@
+{
+  "verdict": {
+    "decision": "Hold",
+    "n_errors": 0,
+    "n_warn_images": 38,
+    "n_images": 202,
+    "warn_ratio": 0.1881,
+    "reasons": [
+      "38/202 ảnh (18.8%) còn cảnh báo chưa người duyệt >= ngưỡng 10%"
+    ]
+  },
+  "reviewed": 80,
+  "budget": 80,
+  "seconds": 7.3,
+  "exported": "E:\\Project\\VinUni\\Lab\\Day08\\K5-L23-Day09-ChuTuanNgoc-2A202603234AutoQC-Pipeline-Lab\\submission\\export\\clean_v1",
+  "config_sha1": "58d1755c0bdeff79633a6922dc2a1518c9d8b6d0",
+  "review_sim_sha1": "7988ca22827f780a7043a2300490e679a1697154"
+}
